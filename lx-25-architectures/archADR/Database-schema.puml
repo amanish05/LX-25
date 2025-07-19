@@ -1,0 +1,100 @@
+@startuml Database_Schema_CQRS
+!define Table(name,desc) class name as "desc" << (T,#FFAAAA) >>
+!define View(name,desc) class name as "desc" << (V,#AAFFAA) >>
+!define Event(name,desc) class name as "desc" << (E,#AAAAFF) >>
+
+package "Write Side - Event Store" {
+    Event(events, "events") {
+        + event_id: UUID
+        + aggregate_id: UUID
+        + aggregate_type: String
+        + event_type: String
+        + event_data: JSONB
+        + event_metadata: JSONB
+        + created_at: Timestamp
+        + version: Integer
+        --
+        Immutable event log
+    }
+    
+    Event(snapshots, "snapshots") {
+        + snapshot_id: UUID
+        + aggregate_id: UUID
+        + aggregate_state: JSONB
+        + version: Integer
+        + created_at: Timestamp
+        --
+        Periodic state snapshots
+    }
+}
+
+package "Read Side - Projections" {
+    View(position_view, "position_view") {
+        + position_id: UUID
+        + symbol: String
+        + strategy: String
+        + quantity: Integer
+        + entry_price: Decimal
+        + current_price: Decimal
+        + unrealized_pnl: Decimal
+        + position_delta: Decimal
+        + position_gamma: Decimal
+        + last_updated: Timestamp
+    }
+    
+    View(portfolio_risk_view, "portfolio_risk_view") {
+        + portfolio_id: UUID
+        + total_delta: Decimal
+        + total_gamma: Decimal
+        + total_theta: Decimal
+        + total_vega: Decimal
+        + var_95: Decimal
+        + margin_used: Decimal
+        + buying_power: Decimal
+        + last_calculated: Timestamp
+    }
+    
+    View(weekly_performance_view, "weekly_performance_view") {
+        + week_id: UUID
+        + symbol: String
+        + strategy: String
+        + signals_generated: Integer
+        + trades_executed: Integer
+        + win_rate: Decimal
+        + total_pnl: Decimal
+        + sharpe_ratio: Decimal
+    }
+}
+
+package "Domain Aggregates" {
+    Table(order_aggregate, "order_aggregate") {
+        In-memory reconstruction
+        from events
+    }
+    
+    Table(position_aggregate, "position_aggregate") {
+        In-memory reconstruction
+        from events
+    }
+}
+
+' Relationships
+events -down-> snapshots : "Periodic snapshots"
+events -right-> position_view : "Project events"
+events -right-> portfolio_risk_view : "Project events"
+events -right-> weekly_performance_view : "Project events"
+
+order_aggregate -up-> events : "Emit events"
+position_aggregate -up-> events : "Emit events"
+
+note right of events
+  **Event Types:**
+  - OrderCreatedEvent
+  - OrderFilledEvent
+  - PositionOpenedEvent
+  - GreeksUpdatedEvent
+  - RiskBreachedEvent
+  - PositionClosedEvent
+end note
+
+@enduml

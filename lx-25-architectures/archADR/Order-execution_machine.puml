@@ -1,0 +1,81 @@
+@startuml Order_Execution_State_Machine
+!define RECTANGLE class
+
+title Order Execution State Machine with Event Sourcing
+
+state "Order Lifecycle" as lifecycle {
+    
+    [*] --> Initialized : CreateOrderCommand
+    
+    Initialized : entry/ValidateOrder
+    Initialized : do/CheckRiskLimits
+    Initialized --> RiskValidation : OrderValidatedEvent
+    
+    state "Risk Validation" as RiskValidation {
+        [*] --> CheckingPosition
+        CheckingPosition --> CheckingMargin : PositionOK
+        CheckingMargin --> CheckingGreeks : MarginOK
+        CheckingGreeks --> [*] : GreeksOK
+    }
+    
+    RiskValidation --> Rejected : RiskRejectedEvent
+    RiskValidation --> PendingExecution : RiskApprovedEvent
+    
+    PendingExecution : do/PrepareOrder
+    
+    state "Multi-Leg Execution" as MultiLeg {
+        [*] --> Leg1Pending
+        Leg1Pending --> Leg1Placed : PlaceLeg1Command
+        Leg1Placed --> Leg1Filled : Leg1FilledEvent
+        Leg1Filled --> Leg2Pending : StartLeg2Command
+        Leg2Pending --> Leg2Placed : PlaceLeg2Command
+        Leg2Placed --> Leg2Filled : Leg2FilledEvent
+        Leg2Filled --> [*] : AllLegsFilledEvent
+    }
+    
+    PendingExecution --> MultiLeg : MultiLegOrderEvent
+    PendingExecution --> Executing : SingleOrderEvent
+    
+    Executing --> PartiallyFilled : PartialFillEvent
+    PartiallyFilled --> Filled : CompleteFillEvent
+    Executing --> Filled : CompleteFillEvent
+    
+    MultiLeg --> PositionOpen : StrategyActiveEvent
+    Filled --> PositionOpen : PositionOpenedEvent
+    
+    state "Position Management" as PositionOpen {
+        [*] --> Monitoring
+        Monitoring --> AdjustmentNeeded : GreeksBreachEvent
+        AdjustmentNeeded --> Adjusting : AdjustPositionCommand
+        Adjusting --> Monitoring : AdjustmentCompleteEvent
+        Monitoring --> ProfitTarget : TargetReachedEvent
+        Monitoring --> StopLoss : StopLossTriggeredEvent
+    }
+    
+    PositionOpen --> Closing : ClosePositionCommand
+    ProfitTarget --> Closing : AutoCloseCommand
+    StopLoss --> Closing : AutoCloseCommand
+    
+    Closing --> Closed : PositionClosedEvent
+    Closed --> [*]
+    
+    Rejected --> [*]
+}
+
+note right of RiskValidation
+  **Events Stored:**
+  - OrderCreatedEvent
+  - RiskCheckStartedEvent
+  - PositionLimitCheckedEvent
+  - MarginVerifiedEvent
+  - GreeksValidatedEvent
+  - RiskApprovedEvent
+end note
+
+note bottom of MultiLeg
+  **Multi-leg coordination:**
+  Ensures atomic execution
+  with rollback capability
+end note
+
+@enduml

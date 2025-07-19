@@ -1,0 +1,78 @@
+{
+  "price_action": {
+    "enabled": true,
+    "weights": {
+      "market_structure": 0.25,
+      "order_blocks": 0.25,
+      "fair_value_gaps": 0.2,
+      "liquidity_zones": 0.2,
+      "patterns": 0.1
+    },
+    "min_strength": 40,
+    "risk_reward_min": 1.2
+  },
+  "bots": {
+    "momentum_rider": {
+      "momentum_threshold": 0.45,
+      "min_confirmations": 3,
+      "use_price_action": true,
+      "pa_min_strength": 40,
+      "pa_weight": 0.4,
+      "volume_spike_multiplier": 2.0,
+      "max_hold_minutes": 30,
+      "trailing_stop_activate": 50,
+      "use_rsi": true,
+      "use_oscillator_matrix": true
+    },
+    "volatility_expander": {
+      "iv_percentile_threshold": 25,
+      "use_price_action": true,
+      "pa_min_strength": 40,
+      "pa_weight": 0.3,
+      "min_squeeze_periods": 10,
+      "profit_target_percent": 100,
+      "stop_loss_percent": -50,
+      "max_hold_days": 5,
+      "use_oscillator_matrix": true
+    },
+    "short_straddle": {
+      "iv_rank_threshold": 70,
+      "use_price_action": true,
+      "pa_filter": true,
+      "profit_target_percent": 25,
+      "stop_loss_percent": -40,
+      "delta_adjustment_threshold": 100,
+      "days_to_expiry_min": 25,
+      "use_rsi_filter": true
+    },
+    "iron_condor": {
+      "iv_percentile_min": 50,
+      "use_price_action": true,
+      "pa_filter": true,
+      "short_strike_delta": 0.2,
+      "wing_width_percent": 2.5,
+      "profit_target_percent": 50,
+      "use_oscillator_confirmation": true
+    }
+  },
+  "optimization_metadata": {
+    "optimization_date": "2025-07-18T23:24:23.829029",
+    "method": "working_pa_optimization",
+    "train_signals": 10,
+    "validation_signals": 5,
+    "optimization_score": 148.85979057730825,
+    "avg_strength": 47.59058430674975,
+    "avg_risk_reward": 1.5763683377479045,
+    "validation_consistency": true,
+    "processing_time_sec": 2.239804744720459,
+    "fine_tuned_date": "2025-07-18T23:25:57.396790",
+    "analysis_results": {
+      "avg_strength": 42.8687311456442,
+      "avg_rr": 1.670209705209385,
+      "avg_signal_rate": 4.25,
+      "best_scenario": "volatile",
+      "total_signals": 17
+    },
+    "changes_applied": []
+  }
+}

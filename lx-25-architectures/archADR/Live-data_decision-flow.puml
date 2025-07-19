@@ -1,0 +1,84 @@
+@startuml Live_Data_Decision_Flow
+
+title Live Data to Auto-Trading Decision Flow
+
+participant "Market Feed" as feed
+participant "Data Buffer" as buffer
+participant "Signal Services" as signals
+participant "Decision Engine" as decision
+participant "Risk Manager" as risk
+participant "Order Manager" as order
+participant "Event Store" as events
+
+autonumber
+
+== Real-time Data Processing ==
+feed -> buffer : Stream tick data
+activate buffer
+buffer -> buffer : Maintain 1-sec snapshots
+buffer -> signals : Publish normalized data
+deactivate buffer
+
+== Parallel Signal Generation ==
+group par [Technical Analysis]
+    signals -> signals : Calculate RSI, MACD, BB
+    signals -> decision : Technical signals
+end
+group par [AI Prediction]
+    signals -> signals : Run LSTM inference
+    signals -> signals : XGBoost prediction
+    signals -> decision : AI signals (conf: 0.82)
+end
+group par [Options Analytics]
+    signals -> signals : Calculate PCR, IV rank
+    signals -> signals : Analyze option flow
+    signals -> decision : Options signals
+end
+
+== Decision Making ==
+activate decision
+decision -> decision : Weight signals by performance
+decision -> decision : Calculate composite score
+alt Confidence > 0.7
+    decision -> decision : Generate BUY signal
+    decision -> risk : Validate trade
+else Confidence < -0.7
+    decision -> decision : Generate SELL signal
+    decision -> risk : Validate trade
+else
+    decision -> decision : HOLD position
+    decision -> events : Log decision
+end
+deactivate decision
+
+== Risk Validation ==
+activate risk
+risk -> risk : Check position limits
+risk -> risk : Verify margin
+risk -> risk : Calculate portfolio Greeks
+
+alt Risk Approved
+    risk -> order : Approved order
+    risk -> events : Log approval
+else Risk Rejected
+    risk -> decision : Rejection reason
+    risk -> events : Log rejection
+end
+deactivate risk
+
+== Order Execution ==
+activate order
+order -> order : Prepare order details
+order -> events : Emit OrderCreatedEvent
+order -> order : Execute via OpenAlgo
+order -> events : Emit OrderFilledEvent
+order -> decision : Execution complete
+deactivate order
+
+note over events
+  **Event Sourcing:**
+  All state changes stored
+  as immutable events
+end note
+
+@enduml

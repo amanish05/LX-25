@@ -1,0 +1,60 @@
+@startuml AI_Model_Execution_Flow
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Dynamic.puml
+
+title AI Model Execution for Auto Trading Decision
+
+Container(market_data, "Market Data", "Real-time feed")
+Container(feature_engine, "Feature Engine", "Technical indicators")
+
+Container_Boundary(ml_pipeline, "ML Pipeline") {
+    Component(feature_store, "Feature Store", "Redis", "Cached features")
+    Component(model_registry, "Model Registry", "MLflow", "Model versions")
+    Component(inference_server, "Inference Server", "TensorFlow Serving")
+    Component(ensemble, "Ensemble Predictor", "Combines predictions")
+}
+
+Container_Boundary(rl_pipeline, "RL Pipeline") {
+    Component(state_builder, "State Builder", "Market state representation")
+    Component(ppo_agent, "PPO Agent", "Policy network")
+    Component(reward_calc, "Reward Calculator", "Risk-adjusted returns")
+    Component(action_mapper, "Action Mapper", "Maps to trading actions")
+}
+
+Container(decision_fusion, "Decision Fusion", "Combines ML & RL")
+Container(trade_executor, "Trade Executor", "Executes decisions")
+
+' Data flow
+market_data -> feature_engine : "1. Stream ticks"
+feature_engine -> feature_store : "2. Store features"
+
+' ML flow
+feature_store -> inference_server : "3. Get features"
+model_registry -> inference_server : "4. Load models"
+inference_server -> ensemble : "5. LSTM: 0.75 prob"
+inference_server -> ensemble : "6. XGBoost: 0.82 prob"
+ensemble -> decision_fusion : "7. ML signal: BUY"
+
+' RL flow
+feature_store -> state_builder : "8. Build state"
+state_builder -> ppo_agent : "9. Current state"
+ppo_agent -> action_mapper : "10. Action: 0.8"
+action_mapper -> decision_fusion : "11. RL signal: BUY 80%"
+
+' Execution
+decision_fusion -> trade_executor : "12. Final: BUY NIFTY 23500 CE"
+
+note right of ensemble
+  **ML Models Performance:**
+  - LSTM: 75-80% accuracy
+  - XGBoost: 70-85% accuracy
+  - Random Forest: ensemble member
+end note
+
+note right of ppo_agent
+  **RL Performance:**
+  - PPO: 1294% annual returns
+  - DQN: 969% annual returns
+  - SAC: 1027% annual returns
+end note
+
+@enduml

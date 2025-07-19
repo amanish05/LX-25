@@ -1,0 +1,84 @@
+{
+  "training_date": "2025-07-19T00:28:52.260246",
+  "model_performance": {
+    "random_forest": {
+      "train_metrics": {
+        "accuracy": 0.9107142857142857,
+        "precision": 0.9545454545454546,
+        "recall": 0.65625,
+        "f1": 0.7777777777777778
+      },
+      "validation_metrics": {
+        "accuracy": 0.7868284228769498,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    "gradient_boost": {
+      "train_metrics": {
+        "accuracy": 0.9933035714285714,
+        "precision": 1.0,
+        "recall": 0.971875,
+        "f1": 0.9857369255150554
+      },
+      "validation_metrics": {
+        "accuracy": 0.7781629116117851,
+        "precision": 0.3076923076923077,
+        "recall": 0.032520325203252036,
+        "f1": 0.058823529411764705
+      }
+    }
+  },
+  "feature_importance": {
+    "random_forest": {
+      "returns": 0.044435890990280016,
+      "log_returns": 0.04723643118763586,
+      "volume_ratio": 0.03423661359814728,
+      "rsi": 0.13920130472642758,
+      "oscillator_score": 0.10930987899261933,
+      "pa_signal": 0.0010854018126245407,
+      "pa_strength": 0.0005081811811944356,
+      "pa_confidence": 0.0,
+      "spread": 0.04779423768870592,
+      "price_position": 0.03592935783740371,
+      "volatility_20": 0.08499207005600647,
+      "volatility_ratio": 0.09476412585019146,
+      "sma_20": 0.09187043614799702,
+      "sma_50": 0.11136462090500475,
+      "trend_strength": 0.15727144902576168
+    },
+    "gradient_boost": {
+      "returns": 0.017381051104119437,
+      "log_returns": 0.01956590937717197,
+      "volume_ratio": 0.02858273133773812,
+      "rsi": 0.15036168484560616,
+      "oscillator_score": 0.04975520094126895,
+      "pa_signal": 4.0182074155099395e-07,
+      "pa_strength": 1.0434919139378232e-05,
+      "pa_confidence": 0.0,
+      "spread": 0.036588002454458556,
+      "price_position": 0.03454215305413195,
+      "volatility_20": 0.0934783047642678,
+      "volatility_ratio": 0.11520403820481151,
+      "sma_20": 0.13097319506682853,
+      "sma_50": 0.13716822222903818,
+      "trend_strength": 0.18638866988067787
+    }
+  },
+  "backtest_results": {
+    "train": {
+      "total_trades": 1,
+      "winning_trades": 1,
+      "losing_trades": 0,
+      "win_rate": 1.0,
+      "total_pnl": 42.87882387920007,
+      "total_return": 0.0004287882387920399,
+      "avg_win": 0.021439411939600035,
+      "avg_loss": 0,
+      "max_drawdown": 0.0,
+      "sharpe_ratio": 0
+    },
+    "test": {}
+  }
+}

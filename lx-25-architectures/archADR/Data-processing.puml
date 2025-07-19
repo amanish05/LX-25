@@ -1,0 +1,59 @@
+@startuml Data_Processing_Architecture
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Real-Time Data Processing with Hexagonal Architecture
+
+Container_Boundary(market_data_service, "Market Data Service") {
+    
+    ' Ports (Interfaces)
+    Container_Boundary(ports, "Ports") {
+        Component(data_input_port, "Data Input Port", "Interface", "Market data ingestion")
+        Component(data_output_port, "Data Output Port", "Interface", "Processed data emission")
+        Component(storage_port, "Storage Port", "Interface", "Data persistence")
+    }
+    
+    ' Core Domain
+    Container_Boundary(domain, "Domain Core") {
+        Component(tick_processor, "Tick Processor", "Validates & normalizes")
+        Component(option_chain_builder, "Option Chain Builder", "Constructs chains")
+        Component(greeks_calculator, "Greeks Calculator", "Real-time Greeks")
+        Component(anomaly_detector, "Anomaly Detector", "Data quality")
+    }
+    
+    ' Adapters
+    Container_Boundary(adapters, "Adapters") {
+        Component(nse_adapter, "NSE Adapter", "NSE WebSocket")
+        Component(truedata_adapter, "TrueData Adapter", "TrueData API")
+        Component(kafka_adapter, "Kafka Producer", "Event streaming")
+        Component(timescale_adapter, "TimescaleDB Adapter", "Time-series storage")
+    }
+}
+
+System_Ext(nse_feed, "NSE Feed")
+System_Ext(truedata_feed, "TrueData")
+Container(kafka, "Kafka", "Event streaming")
+ContainerDb(timescaledb, "TimescaleDB")
+
+' External connections
+Rel(nse_feed, nse_adapter, "WebSocket", "Binary protocol")
+Rel(truedata_feed, truedata_adapter, "API", "REST/WS")
+
+' Adapter to Port
+Rel(nse_adapter, data_input_port, "Implements")
+Rel(truedata_adapter, data_input_port, "Implements")
+Rel(kafka_adapter, data_output_port, "Implements")
+Rel(timescale_adapter, storage_port, "Implements")
+
+' Core flow
+Rel(data_input_port, tick_processor, "Raw ticks")
+Rel(tick_processor, option_chain_builder, "Normalized data")
+Rel(option_chain_builder, greeks_calculator, "Option chains")
+Rel(tick_processor, anomaly_detector, "Quality check")
+
+' Output flow
+Rel(greeks_calculator, data_output_port, "Enriched data")
+Rel(data_output_port, kafka, "Publishes")
+Rel(greeks_calculator, storage_port, "Persists")
+Rel(storage_port, timescaledb, "Stores")
+
+@enduml

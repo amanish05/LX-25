@@ -1,0 +1,80 @@
+@startuml Weekly_Stock_Selection_System
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Weekly Stock Selection and Auto-Trading System
+
+Container_Boundary(selection_system, "Stock Selection System") {
+    
+    Container_Boundary(universe, "Universe Definition") {
+        Component(nifty50, "NIFTY 50", "Index constituents")
+        Component(banknifty, "BANK NIFTY", "Banking stocks")
+        Component(fno_stocks, "F&O Stocks", "Derivatives enabled")
+    }
+    
+    Container_Boundary(screening, "Screening Pipeline") {
+        Component(liquidity_filter, "Liquidity Filter", "> 1Cr volume")
+        Component(options_filter, "Options Activity", "OI > 1000")
+        Component(volatility_filter, "IV Scanner", "IV Rank > 30%")
+        Component(technical_filter, "Technical Levels", "Support/Resistance")
+    }
+    
+    Container_Boundary(ai_selection, "AI Selection Engine") {
+        Component(feature_extractor, "Feature Extractor", "200+ features")
+        Component(ml_ranker, "ML Ranking Model", "XGBoost ranker")
+        Component(regime_detector, "Regime Detector", "Market conditions")
+        Component(strategy_mapper, "Strategy Mapper", "Assigns strategies")
+    }
+    
+    Component(watchlist_manager, "Watchlist Manager", "Top 20 stocks")
+}
+
+Container_Boundary(tracking_system, "Auto-Trading & Tracking") {
+    
+    Component(position_monitor, "Position Monitor", "Real-time tracking")
+    Component(signal_generator, "Signal Generator", "Entry/exit signals")
+    Component(auto_trader, "Auto Trader", "Executes trades")
+    Component(performance_tracker, "Performance Tracker", "P&L monitoring")
+}
+
+ContainerDb(tracking_db, "Tracking Database", "PostgreSQL", "Positions & orders")
+
+' Selection flow
+nifty50 -> liquidity_filter : "1. Initial universe"
+banknifty -> liquidity_filter : ""
+fno_stocks -> liquidity_filter : ""
+
+liquidity_filter -> options_filter : "2. Liquid stocks"
+options_filter -> volatility_filter : "3. Active options"
+volatility_filter -> technical_filter : "4. High IV stocks"
+
+technical_filter -> feature_extractor : "5. Candidates"
+feature_extractor -> ml_ranker : "6. Extract features"
+ml_ranker -> regime_detector : "7. Rank stocks"
+regime_detector -> strategy_mapper : "8. Check regime"
+strategy_mapper -> watchlist_manager : "9. Assign strategies"
+
+' Trading flow
+watchlist_manager -> position_monitor : "10. Weekly watchlist"
+position_monitor -> signal_generator : "11. Monitor prices"
+signal_generator -> auto_trader : "12. Generate signals"
+auto_trader -> tracking_db : "13. Execute & track"
+tracking_db -> performance_tracker : "14. Calculate P&L"
+
+note right of watchlist_manager
+  **Weekly Output:**
+  {
+    "week": "2025-W04",
+    "stocks": [
+      {
+        "symbol": "RELIANCE",
+        "ai_score": 8.5,
+        "strategy": "iron_condor",
+        "entry": [2400, 2500],
+        "sl": 2%,
+        "target": 5%
+      }
+    ]
+  }
+end note
+
+@enduml

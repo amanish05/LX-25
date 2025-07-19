@@ -1,0 +1,104 @@
+# Automated Trading Bot - Requirements
+# Install in order: pip install -r requirements.txt
+
+# ========================================
+# SECTION 1: Core Dependencies (Install First)
+# ========================================
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+scikit-learn>=1.2.0
+python-dotenv>=1.0.0
+pydantic>=1.10.0
+
+# ========================================
+# SECTION 2: Technical Analysis Libraries
+# ========================================
+# Note: TA-Lib requires C library installation first
+# macOS: brew install ta-lib
+# Ubuntu: sudo apt-get install ta-lib
+# Windows: Download from https://www.ta-lib.org/
+# Then uncomment the line below:
+# TA-Lib>=0.4.28
+
+# Alternative (pure Python) - works without C library
+pandas-ta>=0.3.14b0
+
+# ========================================
+# SECTION 3: Database & Storage
+# ========================================
+sqlalchemy>=2.0.0
+pymongo>=4.3.0
+# SQLite async support
+aiosqlite>=0.19.0
+# PostgreSQL support
+asyncpg>=0.29.0
+psycopg2-binary>=2.9.9
+# Database migrations
+alembic>=1.13.0
+
+# ========================================
+# SECTION 4: API & Web Framework
+# ========================================
+fastapi>=0.95.0
+uvicorn>=0.21.0
+requests>=2.28.0
+websocket-client>=1.5.0
+aiohttp>=3.8.0
+
+# ========================================
+# SECTION 5: Data Visualization
+# ========================================
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.14.0
+
+# ========================================
+# SECTION 6: Logging & Utilities
+# ========================================
+click>=8.1.0
+loguru>=0.7.0
+rich>=13.0.0
+structlog>=23.1.0
+
+# ========================================
+# SECTION 7: Testing & Development
+# ========================================
+pytest>=7.3.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.0.0
+pytest-mock>=3.10.0
+black>=23.3.0
+flake8>=6.0.0
+mypy>=1.2.0
+pre-commit>=3.2.0
+
+# ========================================
+# SECTION 8: Optional - Jupyter Support
+# ========================================
+# Uncomment if using Jupyter notebooks
+# jupyter>=1.0.0
+# ipykernel>=6.22.0
+# nbconvert>=7.3.0
+
+# ========================================
+# SECTION 9: Optional - Performance
+# ========================================
+# Uncomment for performance optimization
+# numba>=0.57.0
+# cython>=0.29.0
+
+# ========================================
+# SECTION 10: Optional - Machine Learning
+# ========================================
+# Uncomment when implementing ML features
+# tensorflow>=2.12.0
+# lightgbm>=3.3.0
+# xgboost>=1.7.0
+
+# ========================================
+# SECTION 11: Optional - Broker APIs
+# ========================================
+# Add specific broker API requirements as needed
+# zerodha-kite>=4.0.0
+# fyers-apiv3>=3.0.0

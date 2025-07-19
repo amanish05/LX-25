@@ -1,0 +1,41 @@
+{
+    "system": {
+        "name": "Automated Trading Bot",
+        "version": "2.0.0",
+        "environment": "production",
+        "total_capital": 1000000,
+        "emergency_reserve": 100000
+    },
+    "domains": {
+        "openalgo_api_host": "http://127.0.0.1",
+        "openalgo_api_port": 5000,
+        "database_type": "sqlite",
+        "database_path": "db/openalgo.db"
+    },
+    "api": {
+        "host": "0.0.0.0",
+        "port": 8080,
+        "docs_enabled": true
+    },
+    "logging": {
+        "level": "INFO",
+        "file": "logs/trading_bot.log",
+        "max_size_mb": 10,
+        "backup_count": 5
+    },
+    "monitoring": {
+        "health_check_interval": 60,
+        "position_sync_interval": 30,
+        "metrics_update_interval": 5
+    },
+    "execution": {
+        "order_timeout_seconds": 10,
+        "retry_attempts": 3,
+        "slippage_tolerance": 0.5
+    },
+    "market_hours": {
+        "start": "09:15",
+        "end": "15:30",
+        "timezone": "Asia/Kolkata"
+    }
+}

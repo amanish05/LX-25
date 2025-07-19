@@ -1,0 +1,27 @@
+@startuml C4_Context_Diagram
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Dynamic.puml
+
+title AI-Powered Options Trading System - Context Diagram
+
+Person(trader, "Trader", "Monitors and configures trading strategies")
+Person(ai_agent, "AI Agent", "MCP-enabled Claude/GPT for analysis")
+
+System_Boundary(trading_system, "Options Trading System") {
+    System(auto_trader, "Automated Trading Bot", "Executes options strategies based on AI signals")
+}
+
+System_Ext(nse, "NSE/BSE", "Indian stock exchanges")
+System_Ext(tradingview, "TradingView", "Technical analysis signals")
+System_Ext(openalgo, "OpenAlgo", "Broker abstraction layer")
+System_Ext(brokers, "Brokers", "Zerodha, Upstox, etc.")
+System_Ext(news_api, "News APIs", "Market sentiment data")
+
+Rel(trader, auto_trader, "Configures strategies", "Web UI")
+Rel(ai_agent, auto_trader, "Analyzes & triggers trades", "MCP Protocol")
+Rel(auto_trader, openalgo, "Places orders", "REST API")
+Rel(openalgo, brokers, "Executes trades", "Broker APIs")
+Rel(nse, auto_trader, "Market data", "WebSocket")
+Rel(tradingview, auto_trader, "Trading signals", "Webhooks")
+Rel(news_api, auto_trader, "Sentiment data", "REST API")
+
+@enduml

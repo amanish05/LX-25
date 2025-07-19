@@ -1,0 +1,60 @@
+@startuml C4_Container_Diagram
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Dynamic.puml
+
+
+title Options Trading System - Container Diagram
+
+Person(trader, "Trader")
+Person(ai_agent, "AI Agent")
+
+System_Boundary(trading_system, "Options Trading System") {
+    Container(api_gateway, "API Gateway", "Kong", "Rate limiting, authentication")
+    Container(web_app, "Trading Dashboard", "React", "Strategy configuration & monitoring")
+    
+    Container_Boundary(data_layer, "Data Processing") {
+        Container(market_data, "Market Data Service", "Java", "Real-time data ingestion")
+        Container(event_store, "Event Store", "EventStore", "Event sourcing for orders")
+        Container(cache, "Cache Layer", "Redis", "Hot data & positions")
+    }
+    
+    Container_Boundary(ai_layer, "AI/ML Services") {
+        Container(feature_eng, "Feature Engine", "Python", "Technical indicators & features")
+        Container(ml_models, "ML Model Server", "TensorFlow Serving", "LSTM, XGBoost models")
+        Container(rl_agent, "RL Trading Agent", "Python", "PPO/DQN algorithms")
+    }
+    
+    Container_Boundary(trading_core, "Trading Logic") {
+        Container(strategy_engine, "Strategy Engine", "Python", "Options strategies execution")
+        Container(risk_manager, "Risk Manager", "Python", "Position & Greeks monitoring")
+        Container(order_manager, "Order Manager", "Python", "Multi-leg order coordination")
+    }
+    
+    ContainerDb(timeseries_db, "TimescaleDB", "PostgreSQL", "Market data & analytics")
+    ContainerDb(trading_db, "PostgreSQL", "PostgreSQL", "Orders, positions, config")
+}
+
+System_Ext(mcp_server, "MCP Server", "AI tool exposure")
+System_Ext(openalgo, "OpenAlgo")
+
+Rel(trader, web_app, "Uses", "HTTPS")
+Rel(ai_agent, mcp_server, "Requests analysis", "MCP")
+Rel(mcp_server, api_gateway, "Triggers trades", "REST")
+
+Rel(web_app, api_gateway, "API calls", "HTTPS")
+Rel(api_gateway, strategy_engine, "Routes requests", "HTTP")
+
+Rel(market_data, timeseries_db, "Stores ticks", "SQL")
+Rel(market_data, cache, "Updates prices", "Redis protocol")
+Rel(market_data, event_store, "Publishes events", "Event streaming")
+
+Rel(feature_eng, market_data, "Subscribes to data", "gRPC")
+Rel(feature_eng, ml_models, "Feeds features", "gRPC")
+Rel(ml_models, strategy_engine, "Predictions", "gRPC")
+Rel(rl_agent, strategy_engine, "Actions", "gRPC")
+
+Rel(strategy_engine, risk_manager, "Validates", "Internal")
+Rel(risk_manager, order_manager, "Approves", "Internal")
+Rel(order_manager, openalgo, "Places orders", "REST")
+Rel(order_manager, event_store, "Logs events", "Event streaming")
+
+@enduml

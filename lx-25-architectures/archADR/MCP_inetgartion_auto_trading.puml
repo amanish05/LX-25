@@ -1,0 +1,67 @@
+@startuml MCP_Integration_Flow
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title MCP Integration for AI-Driven Auto Trading
+
+Person(ai_agent, "Claude/GPT", "AI Assistant with MCP client")
+
+Container_Boundary(mcp_layer, "MCP Server Layer") {
+    Component(mcp_server, "MCP Server", "Node.js", "Exposes trading tools")
+    Component(auth_middleware, "Auth Middleware", "JWT + API Keys")
+    Component(tool_registry, "Tool Registry", "Available MCP tools")
+    
+    Container_Boundary(exposed_tools, "MCP Tools") {
+        Component(analyze_tool, "market.analyze", "Analyze stocks/options")
+        Component(backtest_tool, "strategy.backtest", "Test strategies")
+        Component(signal_tool, "signal.check", "Get current signals")
+        Component(trade_tool, "trade.execute", "Place trades")
+        Component(monitor_tool, "position.monitor", "Track positions")
+    }
+}
+
+Container_Boundary(trading_system, "Core Trading System") {
+    Component(mcp_adapter, "MCP Adapter", "Translates MCP to internal")
+    Component(market_analyzer, "Market Analyzer", "Technical & fundamental")
+    Component(backtest_engine, "Backtest Engine", "Historical simulation")
+    Component(signal_processor, "Signal Processor", "Multi-source signals")
+    Component(trade_executor, "Trade Executor", "Order management")
+    Component(position_tracker, "Position Tracker", "Real-time monitoring")
+}
+
+Container(event_store, "Event Store", "Audit trail")
+
+' MCP Flow
+Rel(ai_agent, mcp_server, "1. Request tool", "MCP Protocol")
+Rel(mcp_server, auth_middleware, "2. Validate", "Internal")
+Rel(auth_middleware, tool_registry, "3. Get tool", "Internal")
+
+' Tool execution flows
+Rel(analyze_tool, mcp_adapter, "4a. Analyze request", "gRPC")
+Rel(backtest_tool, mcp_adapter, "4b. Backtest request", "gRPC")
+Rel(trade_tool, mcp_adapter, "4c. Trade request", "gRPC")
+
+Rel(mcp_adapter, market_analyzer, "5. Process", "Internal")
+Rel(mcp_adapter, backtest_engine, "5. Process", "Internal")
+Rel(mcp_adapter, trade_executor, "5. Process", "Internal")
+
+' Audit
+Rel(mcp_adapter, event_store, "Log all actions", "Event")
+
+note right of ai_agent
+  **Example MCP Request:**
+  {
+    "tool": "market.analyze",
+    "params": {
+      "symbol": "NIFTY",
+      "indicators": ["RSI", "MACD"],
+      "ml_models": ["lstm_direction"]
+    }
+  }
+end note
+
+note right of trade_tool
+  **Human approval required**
+  for trade execution
+end note
+
+@enduml

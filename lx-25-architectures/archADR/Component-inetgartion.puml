@@ -1,0 +1,71 @@
+@startuml System_Integration_Overview
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Complete System Integration - Functional View
+
+Container_Boundary(data_layer, "Data Acquisition Layer") {
+    Component(market_feeds, "Market Feeds", "NSE, BSE, TrueData")
+    Component(news_sentiment, "News & Sentiment", "APIs, Social media")
+    Component(tradingview, "TradingView", "Technical signals")
+}
+
+Container_Boundary(processing_layer, "Data Processing Layer") {
+    Component(stream_processor, "Stream Processor", "Kafka Streams")
+    Component(feature_engine, "Feature Engineering", "200+ indicators")
+    Component(data_quality, "Data Quality", "Validation & cleansing")
+}
+
+Container_Boundary(intelligence_layer, "AI/ML Intelligence Layer") {
+    Component(ml_models, "ML Models", "LSTM 80%, XGBoost 85%")
+    Component(rl_agents, "RL Agents", "PPO 1294% returns")
+    Component(regime_detector, "Market Regime", "HMM, GMM models")
+    Component(stock_selector, "Stock Selector", "AI ranking system")
+}
+
+Container_Boundary(strategy_layer, "Strategy & Decision Layer") {
+    Component(strategy_engine, "Strategy Engine", "20+ option strategies")
+    Component(signal_fusion, "Signal Fusion", "Multi-source aggregation")
+    Component(position_sizer, "Position Sizing", "Kelly, fixed fraction")
+}
+
+Container_Boundary(risk_layer, "Risk Management Layer") {
+    Component(pre_trade_risk, "Pre-trade Risk", "Limits, margin, Greeks")
+    Component(real_time_risk, "Real-time Risk", "Portfolio monitoring")
+    Component(compliance, "Compliance", "SEBI regulations")
+}
+
+Container_Boundary(execution_layer, "Execution Layer") {
+    Component(order_manager, "Order Manager", "Multi-leg coordination")
+    Component(openalgo_connector, "OpenAlgo", "Broker abstraction")
+    Component(position_tracker, "Position Tracker", "P&L, Greeks tracking")
+}
+
+Container_Boundary(automation_layer, "Automation & Control") {
+    Component(mcp_interface, "MCP Interface", "AI agent integration")
+    Component(scheduler, "Scheduler", "Cron jobs, triggers")
+    Component(monitoring, "Monitoring", "Alerts, dashboards")
+}
+
+' Key data flows
+Rel_D(market_feeds, stream_processor, "100K msgs/sec")
+Rel_D(stream_processor, feature_engine, "Processes")
+Rel_D(feature_engine, ml_models, "Features")
+
+Rel_R(ml_models, signal_fusion, "Predictions")
+Rel_L(rl_agents, signal_fusion, "Actions")
+Rel(regime_detector, strategy_engine, "Market state")
+
+Rel_D(signal_fusion, strategy_engine, "Combined signals")
+Rel_D(strategy_engine, pre_trade_risk, "Orders")
+Rel_D(pre_trade_risk, order_manager, "Validated orders")
+
+Rel(order_manager, openalgo_connector, "Execute trades")
+Rel(openalgo_connector, position_tracker, "Updates")
+
+Rel_L(real_time_risk, order_manager, "Risk breach")
+Rel_U(position_tracker, real_time_risk, "Positions")
+
+Rel(mcp_interface, ml_models, "Analysis request")
+Rel(mcp_interface, order_manager, "Trade command")
+
+@enduml

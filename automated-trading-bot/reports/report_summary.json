@@ -1,0 +1,39 @@
+{
+  "last_updated": "2025-07-19T07:18:27.535127",
+  "max_versions": 2,
+  "report_types": {
+    "ml_performance": {
+      "count": 1,
+      "files": [
+        "ml_trained_vs_actual_performance.png"
+      ],
+      "best_score": 0.9200000000000002,
+      "latest": "2025-07-19T00:30:18.641046"
+    },
+    "general_performance": {
+      "count": 2,
+      "files": [
+        "indicator_performance_heatmap.png",
+        "enhanced_system_performance.png"
+      ],
+      "best_score": 33.275,
+      "latest": "2025-07-18T22:20:50.650601"
+    },
+    "detailed_metrics": {
+      "count": 1,
+      "files": [
+        "detailed_performance_metrics.png"
+      ],
+      "best_score": 33.275,
+      "latest": "2025-07-19T00:30:17.083951"
+    },
+    "training_comparison": {
+      "count": 1,
+      "files": [
+        "training_vs_actual_performance.png"
+      ],
+      "best_score": 33.275,
+      "latest": "2025-07-19T00:30:16.718899"
+    }
+  }
+}

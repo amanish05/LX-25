@@ -1,0 +1,60 @@
+@startuml Strategy_Engine_Component
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Strategy Engine - Component Diagram with Event Sourcing & CQRS
+
+Container_Boundary(strategy_engine, "Strategy Engine") {
+    
+    Component(event_bus, "Event Bus", "Apache Kafka", "Distributes domain events")
+    
+    Container_Boundary(write_side, "Write Side (Command)") {
+        Component(command_handler, "Command Handler", "Processes trading commands")
+        Component(strategy_aggregate, "Strategy Aggregate", "Domain logic & validation")
+        Component(event_sourcing, "Event Store Writer", "Persists events")
+    }
+    
+    Container_Boundary(read_side, "Read Side (Query)") {
+        Component(projection_builder, "Projection Builder", "Builds read models")
+        Component(position_view, "Position View", "Current positions")
+        Component(pnl_view, "P&L View", "Real-time P&L")
+        Component(risk_view, "Risk View", "Portfolio Greeks")
+    }
+    
+    Container_Boundary(strategies, "Strategy Implementations") {
+        Component(iron_condor, "Iron Condor", "Range-bound strategy")
+        Component(straddle, "Straddle", "Volatility strategy")
+        Component(calendar, "Calendar Spread", "Time decay strategy")
+        Component(custom_rl, "Custom RL", "AI-driven strategy")
+    }
+    
+    Component(strategy_selector, "Strategy Selector", "Chooses optimal strategy")
+    Component(signal_aggregator, "Signal Aggregator", "Combines multiple signals")
+}
+
+ContainerDb(event_store_db, "EventStore", "Event sourcing database")
+ContainerDb(read_db, "PostgreSQL", "Read model projections")
+
+Rel(command_handler, strategy_aggregate, "Executes")
+Rel(strategy_aggregate, event_sourcing, "Emits events")
+Rel(event_sourcing, event_store_db, "Persists")
+Rel(event_sourcing, event_bus, "Publishes")
+
+Rel(event_bus, projection_builder, "Subscribes")
+Rel(projection_builder, position_view, "Updates")
+Rel(projection_builder, pnl_view, "Updates")
+Rel(projection_builder, risk_view, "Updates")
+
+Rel(position_view, read_db, "Stores")
+Rel(pnl_view, read_db, "Stores")
+Rel(risk_view, read_db, "Stores")
+
+Rel(signal_aggregator, strategy_selector, "Feeds signals")
+Rel(strategy_selector, iron_condor, "Activates")
+Rel(strategy_selector, straddle, "Activates")
+Rel(strategy_selector, calendar, "Activates")
+Rel(strategy_selector, custom_rl, "Activates")
+
+Rel(iron_condor, command_handler, "Sends commands")
+Rel(straddle, command_handler, "Sends commands")
+
+@enduml
