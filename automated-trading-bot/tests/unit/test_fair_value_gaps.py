@@ -166,7 +166,7 @@ class TestFairValueGaps:
         
         # Data that partially fills gap
         data = pd.DataFrame({
-            'high': [103] * 30,
+            'high': [103] * 21,
             'low': [102] * 20 + [101]  # Fills 50% of gap
         })
         

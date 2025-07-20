@@ -502,4 +502,16 @@ class MarketStructure(BaseIndicator):
         levels['support'] = sorted(list(set(levels['support'])))
         levels['resistance'] = sorted(list(set(levels['resistance'])), reverse=True)
         
+        # Ensure support is always below resistance
+        if levels['support'] and levels['resistance']:
+            min_resistance = min(levels['resistance'])
+            max_support = max(levels['support'])
+            
+            # Filter out overlapping levels
+            if max_support >= min_resistance:
+                # Remove support levels that are above the minimum resistance
+                levels['support'] = [s for s in levels['support'] if s < min_resistance]
+                # Remove resistance levels that are below the maximum support
+                levels['resistance'] = [r for r in levels['resistance'] if r > max_support]
+        
         return levels

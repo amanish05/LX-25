@@ -1,0 +1,18 @@
+{
+  "weights": {
+    "ml_models": 0.4,
+    "technical_indicators": 0.3,
+    "price_action": 0.2,
+    "confirmation_systems": 0.1
+  },
+  "min_consensus_ratio": 0.6,
+  "min_confidence": 0.5,
+  "indicators": [
+    "rsi_lstm",
+    "adaptive_thresholds",
+    "price_action",
+    "rsi_advanced",
+    "oscillator_matrix"
+  ],
+  "total_indicators": 5
+}

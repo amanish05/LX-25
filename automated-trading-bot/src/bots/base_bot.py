@@ -1,6 +1,6 @@
 """
 Base Bot Class
-Abstract base class for all trading bots
+Abstract base class for all trading bots with ML ensemble integration
 """
 
 import asyncio
@@ -9,11 +9,35 @@ from typing import Dict, Any, List, Optional, Set
 from datetime import datetime, timedelta
 from enum import Enum
 import json
+import os
+from pathlib import Path
+import pandas as pd
 
 from ..core.database import DatabaseManager
 from ..integrations.openalgo_client import OpenAlgoClient
-from ..indicators.composite import CompositeIndicators
 from ..utils.logger import TradingLogger
+
+# ML Ensemble System Imports
+from ..ml.indicator_ensemble import IndicatorEnsemble, EnsembleConfig
+from ..ml.models.rsi_lstm_model import RSILSTMModel
+from ..ml.models.pattern_cnn_model import PatternCNNModel  
+from ..ml.models.adaptive_thresholds_rl import AdaptiveThresholdsRL
+from ..ml.models.confirmation_wrappers import IntegratedConfirmationValidationSystem
+
+# Traditional Indicators
+try:
+    from ..indicators.rsi_advanced import AdvancedRSI
+    from ..indicators.oscillator_matrix import OscillatorMatrix
+    from ..indicators.price_action_composite import PriceActionComposite
+    from ..indicators.advanced_confirmation import AdvancedConfirmationSystem
+    from ..indicators.signal_validator import SignalValidator
+except ImportError:
+    # Fallback for direct execution
+    AdvancedRSI = None
+    OscillatorMatrix = None 
+    PriceActionComposite = None
+    AdvancedConfirmationSystem = None
+    SignalValidator = None
 
 
 class BotState(Enum):
@@ -75,8 +99,9 @@ class BaseBot(ABC):
         self.symbols: Set[str] = set()
         self.symbol_data: Dict[str, Dict[str, Any]] = {}
         
-        # Indicators
-        self.indicators = CompositeIndicators(config.get("indicators", {}))
+        # ML Ensemble System (replaces CompositeIndicators)
+        self.indicators = None  # Will be initialized in initialize() method
+        self.ml_config = None
         
         # State management
         self.state = BotState.INITIALIZED
@@ -124,11 +149,320 @@ class BaseBot(ABC):
         """Determine if position exit conditions are met"""
         pass
     
+    async def _initialize_ml_ensemble(self):
+        """Initialize ML ensemble system with models and indicators"""
+        try:
+            # Load ML configuration
+            config_path = Path("config/ml_models_config.json")
+            if config_path.exists():
+                with open(config_path, 'r') as f:
+                    self.ml_config = json.load(f)
+            else:
+                self.logger.warning("ML config not found, using default configuration")
+                self.ml_config = self._get_default_ml_config()
+            
+            # Create ensemble configuration
+            ensemble_config_data = self.ml_config.get("ensemble_config", {})
+            ensemble_config = EnsembleConfig(
+                weights=ensemble_config_data.get("weights", {}),
+                indicator_weights=ensemble_config_data.get("indicator_weights", {}),
+                min_consensus_ratio=ensemble_config_data.get("min_consensus_ratio", 0.6),
+                min_confidence=ensemble_config_data.get("min_confidence", 0.5),
+                adaptive_weights=ensemble_config_data.get("adaptive_weights", True),
+                performance_window=ensemble_config_data.get("performance_window", 100)
+            )
+            
+            # Initialize indicator ensemble
+            self.indicators = IndicatorEnsemble(ensemble_config)
+            
+            # Initialize confirmation and validation system
+            confirmation_config = {
+                'min_combined_score': self.ml_config.get('min_combined_score', 0.65),
+                'require_confirmation': self.ml_config.get('require_confirmation', True),
+                'ml_validator_config': self.ml_config.get('price_action_ml_config', {}).get('validator_config')
+            }
+            self.confirmation_validator = IntegratedConfirmationValidationSystem(confirmation_config)
+            
+            # Add ML models to ensemble
+            await self._add_ml_models_to_ensemble()
+            
+            # Add traditional indicators to ensemble
+            await self._add_traditional_indicators_to_ensemble()
+            
+            self.logger.info("ML ensemble system initialized successfully")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to initialize ML ensemble: {e}")
+            # Fallback to simple ensemble without models
+            self.indicators = IndicatorEnsemble()
+            raise
+    
+    async def _add_ml_models_to_ensemble(self):
+        """Add ML models to the ensemble"""
+        try:
+            ml_models_config = self.ml_config.get("ml_models", {})
+            
+            # Initialize RSI LSTM Model
+            if ml_models_config.get("rsi_lstm", {}).get("enabled", False):
+                try:
+                    rsi_lstm_config = ml_models_config["rsi_lstm"]
+                    rsi_lstm_model = RSILSTMModel(
+                        sequence_length=rsi_lstm_config.get("sequence_length", 25),
+                        hidden_units=rsi_lstm_config.get("hidden_units", 64),
+                        num_layers=rsi_lstm_config.get("num_layers", 2),
+                        dropout=rsi_lstm_config.get("dropout", 0.2)
+                    )
+                    
+                    # Load trained model if exists
+                    model_path = rsi_lstm_config.get("model_path", "models/rsi_lstm_model.pkl")
+                    if os.path.exists(model_path):
+                        rsi_lstm_model.load_model(model_path)
+                        self.logger.info("Loaded RSI LSTM model from disk")
+                    
+                    self.indicators.add_ml_model("rsi_lstm", rsi_lstm_model)
+                    
+                except Exception as e:
+                    self.logger.warning(f"Failed to add RSI LSTM model: {e}")
+            
+            # Initialize Pattern CNN Model
+            if ml_models_config.get("pattern_cnn", {}).get("enabled", False):
+                try:
+                    pattern_cnn_config = ml_models_config["pattern_cnn"]
+                    pattern_cnn_model = PatternCNNModel(
+                        image_size=pattern_cnn_config.get("image_size", [64, 64]),
+                        num_channels=pattern_cnn_config.get("num_channels", 1)
+                    )
+                    
+                    # Load trained model if exists
+                    model_path = pattern_cnn_config.get("model_path", "models/pattern_cnn_model.pkl")
+                    if os.path.exists(model_path):
+                        pattern_cnn_model.load_model(model_path)
+                        self.logger.info("Loaded Pattern CNN model from disk")
+                    
+                    self.indicators.add_ml_model("pattern_cnn", pattern_cnn_model)
+                    
+                except Exception as e:
+                    self.logger.warning(f"Failed to add Pattern CNN model: {e}")
+            
+            # Initialize Adaptive Thresholds RL Model
+            if ml_models_config.get("adaptive_thresholds", {}).get("enabled", False):
+                try:
+                    adaptive_config = ml_models_config["adaptive_thresholds"]
+                    adaptive_model = AdaptiveThresholdsRL(
+                        lookback_window=adaptive_config.get("environment_params", {}).get("lookback_window", 50)
+                    )
+                    
+                    # Load trained model if exists
+                    model_path = adaptive_config.get("model_path", "models/adaptive_thresholds_model.pkl")
+                    if os.path.exists(model_path):
+                        adaptive_model.load_model(model_path)
+                        self.logger.info("Loaded Adaptive Thresholds model from disk")
+                    
+                    self.indicators.add_ml_model("adaptive_thresholds", adaptive_model)
+                    
+                except Exception as e:
+                    self.logger.warning(f"Failed to add Adaptive Thresholds model: {e}")
+                        
+        except Exception as e:
+            self.logger.error(f"Error adding ML models to ensemble: {e}")
+    
+    async def _add_traditional_indicators_to_ensemble(self):
+        """Add traditional indicators to the ensemble"""
+        try:
+            traditional_config = self.ml_config.get("traditional_indicators", {})
+            
+            # Add Advanced RSI
+            if traditional_config.get("advanced_rsi", {}).get("enabled", False) and AdvancedRSI:
+                try:
+                    rsi_config = traditional_config["advanced_rsi"]
+                    advanced_rsi = AdvancedRSI(
+                        period=rsi_config.get("period", 14),
+                        overbought=rsi_config.get("overbought", 70),
+                        oversold=rsi_config.get("oversold", 30)
+                    )
+                    self.indicators.add_traditional_indicator("advanced_rsi", advanced_rsi)
+                    
+                except Exception as e:
+                    self.logger.warning(f"Failed to add Advanced RSI: {e}")
+            
+            # Add Oscillator Matrix
+            if traditional_config.get("oscillator_matrix", {}).get("enabled", False) and OscillatorMatrix:
+                try:
+                    oscillator_config = traditional_config["oscillator_matrix"]
+                    oscillator_matrix = OscillatorMatrix(
+                        indicators=oscillator_config.get("indicators", ["rsi", "macd", "stochastic"]),
+                        weights=oscillator_config.get("weights", {})
+                    )
+                    self.indicators.add_traditional_indicator("oscillator_matrix", oscillator_matrix)
+                    
+                except Exception as e:
+                    self.logger.warning(f"Failed to add Oscillator Matrix: {e}")
+            
+            # Add Price Action Composite or ML-Enhanced Price Action
+            if traditional_config.get("price_action_composite", {}).get("enabled", False):
+                try:
+                    # Check if ML-enhanced price action is enabled
+                    price_action_ml_config = self.ml_config.get("price_action_ml_config", {})
+                    if price_action_ml_config.get("enabled", False):
+                        # Use ML-enhanced price action system
+                        from ..ml.models.price_action_ml_wrapper import MLEnhancedPriceActionSystem
+                        price_action = MLEnhancedPriceActionSystem(price_action_ml_config)
+                        self.indicators.add_traditional_indicator("price_action_composite", price_action)
+                        self.logger.info("Added ML-enhanced Price Action System to ensemble")
+                    elif PriceActionComposite:
+                        # Use traditional price action
+                        pa_config = traditional_config["price_action_composite"]
+                        price_action = PriceActionComposite(
+                            weights=pa_config.get("weights", {}),
+                            min_signal_strength=pa_config.get("min_strength", 40)
+                        )
+                        self.indicators.add_traditional_indicator("price_action_composite", price_action)
+                        self.logger.info("Added traditional Price Action Composite to ensemble")
+                    
+                except Exception as e:
+                    self.logger.warning(f"Failed to add Price Action Composite: {e}")
+                        
+        except Exception as e:
+            self.logger.error(f"Error adding traditional indicators to ensemble: {e}")
+    
+    def _get_default_ml_config(self) -> Dict[str, Any]:
+        """Get default ML configuration if config file is missing"""
+        return {
+            "ensemble_config": {
+                "weights": {
+                    "ml_models": 0.4,
+                    "technical_indicators": 0.6
+                },
+                "min_consensus_ratio": 0.6,
+                "min_confidence": 0.5,
+                "adaptive_weights": True
+            },
+            "ml_models": {},
+            "traditional_indicators": {}
+        }
+    
+    def _convert_to_dataframe(self, data: Dict[str, Any]) -> 'pd.DataFrame':
+        """Convert market data to pandas DataFrame for ensemble processing"""
+        import pandas as pd
+        import numpy as np
+        from datetime import datetime
+        
+        # Handle different data formats
+        if isinstance(data, dict):
+            if 'timestamp' in data or 'time' in data:
+                # Single data point - need historical data
+                # Try to get historical data from symbol_data cache
+                symbol_history = list(self.symbol_data.values())
+                if len(symbol_history) < 20:
+                    # Not enough data, create minimal DataFrame
+                    return pd.DataFrame({
+                        'open': [data.get('open', data.get('ltp', 100))],
+                        'high': [data.get('high', data.get('ltp', 100))],
+                        'low': [data.get('low', data.get('ltp', 100))],
+                        'close': [data.get('close', data.get('ltp', 100))],
+                        'volume': [data.get('volume', 10000)]
+                    }, index=[datetime.now()])
+                else:
+                    # Build DataFrame from historical data
+                    df_data = []
+                    for hist_data in symbol_history[-50:]:  # Last 50 data points
+                        df_data.append({
+                            'open': hist_data.get('open', hist_data.get('ltp', 100)),
+                            'high': hist_data.get('high', hist_data.get('ltp', 100)),
+                            'low': hist_data.get('low', hist_data.get('ltp', 100)),
+                            'close': hist_data.get('close', hist_data.get('ltp', 100)),
+                            'volume': hist_data.get('volume', 10000)
+                        })
+                    
+                    timestamps = pd.date_range(end=datetime.now(), periods=len(df_data), freq='5min')
+                    return pd.DataFrame(df_data, index=timestamps)
+            else:
+                # Assume it's already formatted data
+                return pd.DataFrame(data)
+        else:
+            # Fallback: create minimal DataFrame
+            return pd.DataFrame({
+                'open': [100], 'high': [100], 'low': [100], 'close': [100], 'volume': [10000]
+            }, index=[datetime.now()])
+    
+    def _enhance_signal_with_ensemble(self, bot_signal: Dict[str, Any], 
+                                    ensemble_signal) -> Dict[str, Any]:
+        """Enhance bot signal with ML ensemble insights"""
+        try:
+            # Get bot-specific ML configuration
+            bot_config = self.ml_config.get("bot_specific_settings", {}).get(self.bot_type, {})
+            
+            if not bot_config.get("use_ml_ensemble", False):
+                return bot_signal
+            
+            ml_weight = bot_config.get("ml_weight", 0.4)
+            traditional_weight = bot_config.get("traditional_weight", 0.6)
+            min_ensemble_strength = bot_config.get("min_ensemble_strength", 0.6)
+            
+            # Check if ensemble meets minimum strength requirement
+            if ensemble_signal.strength < min_ensemble_strength:
+                self.logger.debug(f"Ensemble strength {ensemble_signal.strength:.2f} below threshold {min_ensemble_strength}")
+                return bot_signal
+            
+            # Check signal alignment
+            bot_signal_type = bot_signal.get("type", "NEUTRAL")
+            ensemble_signal_type = ensemble_signal.signal_type.upper()
+            
+            if bot_signal_type == ensemble_signal_type:
+                # Signals agree - enhance strength
+                original_strength = bot_signal.get("strength", 0.5)
+                enhanced_strength = (original_strength * traditional_weight + 
+                                   ensemble_signal.strength * ml_weight)
+                
+                bot_signal["strength"] = min(enhanced_strength, 1.0)
+                bot_signal["ml_enhanced"] = True
+                bot_signal["ensemble_confidence"] = ensemble_signal.confidence
+                bot_signal["consensus_ratio"] = ensemble_signal.consensus_ratio
+                
+                # Add target and stop from ensemble if available
+                if ensemble_signal.target_price:
+                    bot_signal["ml_target"] = ensemble_signal.target_price
+                if ensemble_signal.stop_loss:
+                    bot_signal["ml_stop"] = ensemble_signal.stop_loss
+                if ensemble_signal.risk_reward_ratio:
+                    bot_signal["ml_risk_reward"] = ensemble_signal.risk_reward_ratio
+                
+                self.logger.info(f"Signal enhanced with ML: {bot_signal_type} "
+                               f"strength {original_strength:.2f} → {enhanced_strength:.2f}")
+            
+            elif bot_signal_type in ["BUY", "SELL"] and ensemble_signal_type in ["BUY", "SELL"]:
+                # Conflicting signals - reduce strength
+                if ensemble_signal.confidence > 0.7:
+                    bot_signal["strength"] *= 0.5  # Significantly reduce strength
+                    bot_signal["ml_conflict"] = True
+                    bot_signal["conflict_reason"] = f"Bot: {bot_signal_type}, ML: {ensemble_signal_type}"
+                    
+                    self.logger.warning(f"ML ensemble conflicts with bot signal: "
+                                      f"{bot_signal_type} vs {ensemble_signal_type}")
+            
+            # Add ensemble metadata
+            bot_signal["ensemble_metadata"] = {
+                "signal_type": ensemble_signal.signal_type,
+                "strength": ensemble_signal.strength,
+                "confidence": ensemble_signal.confidence,
+                "consensus_ratio": ensemble_signal.consensus_ratio,
+                "contributing_indicators": ensemble_signal.contributing_indicators
+            }
+            
+            return bot_signal
+            
+        except Exception as e:
+            self.logger.error(f"Error enhancing signal with ensemble: {e}")
+            return bot_signal
+    
     async def start(self):
         """Start the bot"""
         try:
             self.state = BotState.STARTING
             self.logger.info(f"Starting bot {self.name}")
+            
+            # Initialize ML ensemble system first
+            await self._initialize_ml_ensemble()
             
             # Initialize bot-specific components
             await self.initialize()
@@ -201,8 +535,53 @@ class BaseBot(ABC):
             # Update symbol data cache
             self.symbol_data[symbol] = data
             
-            # Generate signals
+            # Generate ML ensemble signal first (if we have enough data)
+            ensemble_signal = None
+            if self.indicators and len(self.symbol_data.get(symbol, {})) > 0:
+                try:
+                    # Convert data to pandas DataFrame for ensemble
+                    import pandas as pd
+                    df_data = self._convert_to_dataframe(data)
+                    
+                    # Generate ensemble signal
+                    ensemble_signal = self.indicators.generate_ensemble_signal(df_data)
+                    
+                    if ensemble_signal:
+                        self.logger.debug(f"ML ensemble generated signal: {ensemble_signal.signal_type} "
+                                        f"(strength: {ensemble_signal.strength:.2f}, "
+                                        f"confidence: {ensemble_signal.confidence:.2f})")
+                        
+                except Exception as e:
+                    self.logger.debug(f"ML ensemble signal generation failed: {e}")
+            
+            # Generate bot-specific signals (traditional logic)
             signal = await self.generate_signals(symbol, data)
+            
+            # Enhance signal with ML ensemble insights
+            if signal and ensemble_signal:
+                signal = self._enhance_signal_with_ensemble(signal, ensemble_signal)
+            
+            # Apply confirmation and validation system
+            if signal and hasattr(self, 'confirmation_validator'):
+                # Convert to pandas DataFrame for validation
+                df_data = self._convert_to_dataframe(data) if not isinstance(data, pd.DataFrame) else data
+                
+                # Process through confirmation and validation pipeline
+                validation_result = self.confirmation_validator.process_ensemble_signal(
+                    ensemble_signal.__dict__ if ensemble_signal else signal,
+                    df_data,
+                    entry_price=signal.get('entry_price')
+                )
+                
+                if not validation_result['is_approved']:
+                    self.logger.info(f"Signal rejected by confirmation/validation system: "
+                                   f"combined_score={validation_result['combined_score']:.2f}")
+                    signal = None
+                else:
+                    # Enhance signal with validation data
+                    signal['validation'] = validation_result
+                    signal['ml_confidence'] = validation_result['combined_score']
+                    self.logger.info(f"Signal approved with confidence: {signal['ml_confidence']:.2f}")
             
             if signal:
                 # Save signal to database

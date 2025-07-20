@@ -1,0 +1,192 @@
+{
+  "ensemble_config": {
+    "weights": {
+      "ml_models": 0.4,
+      "technical_indicators": 0.3,
+      "price_action": 0.2,
+      "confirmation_systems": 0.1
+    },
+    "indicator_weights": {
+      "rsi_lstm": 0.15,
+      "pattern_cnn": 0.15,
+      "adaptive_thresholds": 0.10,
+      "advanced_rsi": 0.10,
+      "oscillator_matrix": 0.10,
+      "price_action_composite": 0.20,
+      "advanced_confirmation": 0.10,
+      "signal_validator": 0.10
+    },
+    "min_consensus_ratio": 0.6,
+    "min_confidence": 0.5,
+    "adaptive_weights": true,
+    "performance_window": 100
+  },
+  "ml_models": {
+    "rsi_lstm": {
+      "enabled": true,
+      "model_path": "models/rsi_lstm_model.pkl",
+      "sequence_length": 25,
+      "hidden_units": 64,
+      "num_layers": 2,
+      "dropout": 0.2,
+      "training_params": {
+        "epochs": 100,
+        "batch_size": 32,
+        "learning_rate": 0.001
+      }
+    },
+    "pattern_cnn": {
+      "enabled": true,
+      "model_path": "models/pattern_cnn_model.pkl",
+      "image_size": [64, 64],
+      "num_channels": 1,
+      "cnn_layers": [32, 64, 128],
+      "dense_layers": [256, 128],
+      "dropout": 0.3,
+      "training_params": {
+        "epochs": 150,
+        "batch_size": 16,
+        "learning_rate": 0.0005
+      }
+    },
+    "adaptive_thresholds": {
+      "enabled": true,
+      "model_path": "models/adaptive_thresholds_model.pkl",
+      "algorithm": "PPO",
+      "training_params": {
+        "total_timesteps": 100000,
+        "learning_rate": 0.0003,
+        "batch_size": 64,
+        "n_steps": 2048
+      },
+      "environment_params": {
+        "lookback_window": 50,
+        "reward_scaling": 1.0,
+        "action_space_bounds": [-0.5, 0.5]
+      }
+    }
+  },
+  "traditional_indicators": {
+    "advanced_rsi": {
+      "enabled": true,
+      "period": 14,
+      "overbought": 70,
+      "oversold": 30,
+      "divergence_detection": true
+    },
+    "oscillator_matrix": {
+      "enabled": true,
+      "indicators": ["rsi", "macd", "stochastic", "cci", "williams_r"],
+      "weights": {
+        "rsi": 0.25,
+        "macd": 0.25,
+        "stochastic": 0.20,
+        "cci": 0.15,
+        "williams_r": 0.15
+      }
+    },
+    "price_action_composite": {
+      "enabled": true,
+      "weights": {
+        "market_structure": 0.25,
+        "order_blocks": 0.25,
+        "fair_value_gaps": 0.20,
+        "liquidity_zones": 0.20,
+        "patterns": 0.10
+      },
+      "min_strength": 40,
+      "risk_reward_min": 1.2
+    }
+  },
+  "bot_specific_settings": {
+    "momentum_rider": {
+      "use_ml_ensemble": true,
+      "ml_weight": 0.4,
+      "traditional_weight": 0.6,
+      "min_ensemble_strength": 0.65,
+      "ml_models_enabled": ["rsi_lstm", "pattern_cnn"],
+      "confirmation_required": 3
+    },
+    "short_straddle": {
+      "use_ml_ensemble": true,
+      "ml_weight": 0.3,
+      "traditional_weight": 0.7,
+      "min_ensemble_strength": 0.5,
+      "ml_models_enabled": ["adaptive_thresholds", "pattern_cnn"],
+      "use_as_filter": true
+    },
+    "volatility_expander": {
+      "use_ml_ensemble": true,
+      "ml_weight": 0.35,
+      "traditional_weight": 0.65,
+      "min_ensemble_strength": 0.6,
+      "ml_models_enabled": ["rsi_lstm", "adaptive_thresholds"],
+      "confirmation_required": 2
+    }
+  },
+  "performance_tracking": {
+    "enabled": true,
+    "update_frequency_minutes": 60,
+    "weight_adjustment_threshold": 0.1,
+    "min_trades_for_adjustment": 20,
+    "performance_metrics": [
+      "win_rate",
+      "avg_return",
+      "sharpe_ratio",
+      "max_drawdown",
+      "consistency_score"
+    ]
+  },
+  "risk_management": {
+    "max_ensemble_positions": 5,
+    "min_risk_reward_ratio": 1.5,
+    "max_correlation_threshold": 0.7,
+    "ensemble_stop_loss_multiplier": 0.8,
+    "dynamic_position_sizing": true
+  },
+  "model_retraining": {
+    "enabled": true,
+    "retrain_frequency_days": 30,
+    "performance_threshold": 0.05,
+    "min_new_data_points": 1000,
+    "validation_split": 0.2,
+    "early_stopping_patience": 10
+  },
+  "price_action_ml_config": {
+    "enabled": true,
+    "validator_config": {
+      "bos_confidence_threshold": 0.7,
+      "choch_confidence_threshold": 0.75,
+      "pattern_min_score": 0.65,
+      "volume_confirmation_weight": 0.3,
+      "time_of_day_weight": 0.1,
+      "false_positive_penalty": 0.8
+    },
+    "structure_break_config": {
+      "ml_validation_enabled": true,
+      "min_ml_confidence": 0.6,
+      "rejection_rate_threshold": 0.5,
+      "performance_tracking": true
+    },
+    "order_block_config": {
+      "ml_scoring_enabled": true,
+      "min_ml_score": 0.65,
+      "volume_weight": 0.4,
+      "structure_weight": 0.3,
+      "confluence_weight": 0.3
+    },
+    "fvg_config": {
+      "ml_scoring_enabled": true,
+      "min_ml_score": 0.6,
+      "optimal_size_range": [0.5, 3.0],
+      "volume_threshold": 1.5
+    },
+    "liquidity_zone_config": {
+      "ml_ranking_enabled": true,
+      "min_touches": 2,
+      "age_weight": 0.1,
+      "strength_weight": 0.2,
+      "performance_weight": 0.2
+    }
+  }
+}

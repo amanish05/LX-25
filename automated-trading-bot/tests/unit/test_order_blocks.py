@@ -127,7 +127,7 @@ class TestOrderBlocks:
         # Create data that mitigates the block
         data = pd.DataFrame({
             'high': [100] * 20 + [102],
-            'low': [98] * 20 + [97]  # Breaks below block
+            'low': [100] * 20 + [97]  # Only breaks below block at index 20
         })
         
         # Before mitigation

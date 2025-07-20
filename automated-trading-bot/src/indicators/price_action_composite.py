@@ -295,14 +295,15 @@ class PriceActionComposite(BaseIndicator):
             take_profit = current_price - (atr * 4)
         
         # Adjust based on patterns
-        if 'patterns' in components and components['patterns']['pattern_data']['pattern_type'].iloc[idx]:
-            pattern_target = components['patterns']['pattern_data']['pattern_target'].iloc[idx]
-            pattern_stop = components['patterns']['pattern_data']['pattern_stop'].iloc[idx]
-            
-            if pattern_target > 0:
-                take_profit = pattern_target
-            if pattern_stop > 0:
-                stop_loss = pattern_stop
+        if 'patterns' in components and idx < len(components['patterns']['pattern_data']['pattern_type']):
+            if components['patterns']['pattern_data']['pattern_type'].iloc[idx]:
+                pattern_target = components['patterns']['pattern_data']['pattern_target'].iloc[idx]
+                pattern_stop = components['patterns']['pattern_data']['pattern_stop'].iloc[idx]
+                
+                if pattern_target > 0:
+                    take_profit = pattern_target
+                if pattern_stop > 0:
+                    stop_loss = pattern_stop
         
         # Adjust based on liquidity zones
         if 'liquidity' in components:

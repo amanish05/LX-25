@@ -9,8 +9,7 @@
     "domains": {
         "openalgo_api_host": "http://127.0.0.1",
         "openalgo_api_port": 5000,
-        "database_type": "sqlite",
-        "database_path": "db/openalgo.db"
+        "database_type": "postgresql"
     },
     "api": {
         "host": "0.0.0.0",

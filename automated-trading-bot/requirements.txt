@@ -5,7 +5,7 @@
 # SECTION 1: Core Dependencies (Install First)
 # ========================================
 pandas>=2.0.0
-numpy>=1.24.0
+numpy>=1.26.0  # Updated for Python 3.13 compatibility
 scipy>=1.10.0
 scikit-learn>=1.2.0
 python-dotenv>=1.0.0
@@ -15,11 +15,11 @@ pydantic>=1.10.0
 # SECTION 2: Technical Analysis Libraries
 # ========================================
 # Note: TA-Lib requires C library installation first
-# macOS: brew install ta-lib
+# macOS: brew install ta-lib (or /opt/homebrew/bin/brew install ta-lib for Apple Silicon)
 # Ubuntu: sudo apt-get install ta-lib
 # Windows: Download from https://www.ta-lib.org/
 # Then uncomment the line below:
-# TA-Lib>=0.4.28
+TA-Lib>=0.4.28
 
 # Alternative (pure Python) - works without C library
 pandas-ta>=0.3.14b0
@@ -28,14 +28,9 @@ pandas-ta>=0.3.14b0
 # SECTION 3: Database & Storage
 # ========================================
 sqlalchemy>=2.0.0
-pymongo>=4.3.0
-# SQLite async support
-aiosqlite>=0.19.0
 # PostgreSQL support
 asyncpg>=0.29.0
 psycopg2-binary>=2.9.9
-# Database migrations
-alembic>=1.13.0
 
 # ========================================
 # SECTION 4: API & Web Framework
@@ -43,7 +38,9 @@ alembic>=1.13.0
 fastapi>=0.95.0
 uvicorn>=0.21.0
 requests>=2.28.0
+httpx>=0.23.0
 websocket-client>=1.5.0
+websockets>=10.0
 aiohttp>=3.8.0
 
 # ========================================
@@ -60,6 +57,7 @@ click>=8.1.0
 loguru>=0.7.0
 rich>=13.0.0
 structlog>=23.1.0
+psutil>=5.9.0
 
 # ========================================
 # SECTION 7: Testing & Development
@@ -89,15 +87,63 @@ pre-commit>=3.2.0
 # cython>=0.29.0
 
 # ========================================
-# SECTION 10: Optional - Machine Learning
+# SECTION 10: Machine Learning & Advanced Analytics
 # ========================================
-# Uncomment when implementing ML features
-# tensorflow>=2.12.0
-# lightgbm>=3.3.0
-# xgboost>=1.7.0
+# Feature importance and explainability
+shap>=0.41.0
+
+# Hidden Markov Models for regime detection
+hmmlearn>=0.3.0
+
+# Optimization algorithms
+optuna>=3.0.0  # Bayesian optimization
+deap>=1.3.0    # Genetic algorithms
+
+# Deep learning frameworks - REQUIRED for Individual Indicator Intelligence
+tensorflow>=2.15.0  # Compatible with Python 3.12 and NumPy 1.26+
+keras>=2.15.0  # Keras for TensorFlow 2.15+
+
+# Reinforcement Learning - REQUIRED for Adaptive Thresholds
+stable-baselines3>=2.0.0
+gymnasium>=0.28.0  # Updated OpenAI Gym
+
+# Computer Vision for Pattern Recognition
+opencv-python>=4.7.0
+Pillow>=9.5.0
+scikit-image>=0.21.0  # Required for pattern_cnn_model
+
+# Additional ML libraries
+lightgbm>=3.3.0
+xgboost>=1.7.0
+
+# Time series specific
+statsmodels>=0.14.0
+arch>=5.3.0  # For GARCH models
+
+# Enhanced ML utilities
+imbalanced-learn>=0.10.0  # For handling imbalanced datasets
+tensorboard>=2.12.0  # For model monitoring
+joblib>=1.2.0  # For model serialization
 
 # ========================================
-# SECTION 11: Optional - Broker APIs
+# SECTION 11: Time Series Database
+# ========================================
+# TimescaleDB toolkit
+psycopg2-pool>=1.1  # Connection pooling for TimescaleDB
+
+# ========================================
+# SECTION 12: Jupyter & Interactive
+# ========================================
+# Jupyter notebook for live monitoring
+jupyter>=1.0.0
+ipywidgets>=8.0.0  # Interactive widgets
+jupyterlab>=4.0.0  # Modern Jupyter interface
+# Note: TimescaleDB is a PostgreSQL extension, install via:
+# Ubuntu: sudo apt install postgresql-14-timescaledb
+# macOS: brew install timescaledb
+
+# ========================================
+# SECTION 12: Optional - Broker APIs
 # ========================================
 # Add specific broker API requirements as needed
 # zerodha-kite>=4.0.0

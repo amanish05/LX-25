@@ -124,7 +124,16 @@ class SignalValidator:
     
     def _validate_market_hours(self, signal: Dict) -> bool:
         """Validate if signal is during optimal market hours"""
-        signal_time = datetime.fromisoformat(signal.get('timestamp', datetime.now().isoformat()))
+        timestamp = signal.get('timestamp', datetime.now())
+        
+        # Handle both string and datetime objects
+        if isinstance(timestamp, str):
+            signal_time = datetime.fromisoformat(timestamp)
+        elif isinstance(timestamp, datetime):
+            signal_time = timestamp
+        else:
+            signal_time = datetime.now()
+            
         hour = signal_time.hour
         minute = signal_time.minute
         
@@ -241,7 +250,16 @@ class SignalValidator:
     
     def _validate_time_of_day(self, signal: Dict) -> Tuple[bool, float]:
         """Validate based on time of day performance"""
-        signal_time = datetime.fromisoformat(signal.get('timestamp', datetime.now().isoformat()))
+        timestamp = signal.get('timestamp', datetime.now())
+        
+        # Handle both string and datetime objects
+        if isinstance(timestamp, str):
+            signal_time = datetime.fromisoformat(timestamp)
+        elif isinstance(timestamp, datetime):
+            signal_time = timestamp
+        else:
+            signal_time = datetime.now()
+            
         time_key = f"{signal_time.hour:02d}:{signal_time.minute//15*15:02d}"
         
         # Check historical performance

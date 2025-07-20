@@ -10,6 +10,7 @@ import subprocess
 import time
 from datetime import datetime
 import json
+import os
 
 class DeploymentPipeline:
     def __init__(self):
@@ -32,9 +33,9 @@ class DeploymentPipeline:
         try:
             # Activate virtual environment and run command
             if isinstance(command, str):
-                full_command = f"source venv/bin/activate && {command}"
+                full_command = f"source .venv/bin/activate && {command}"
             else:
-                full_command = "source venv/bin/activate && " + " ".join(command)
+                full_command = "source .venv/bin/activate && " + " ".join(command)
             
             result = subprocess.run(
                 full_command,
@@ -119,11 +120,61 @@ class DeploymentPipeline:
     def step_3_run_tests(self):
         """Step 3: Run comprehensive test suite"""
         self.log("STEP 3: Test Suite", "INFO")
-        return self.run_command("DEPLOYMENT_PIPELINE=1 ./tests/scripts/run_tests.sh fast", "tests", timeout=180)
+        
+        # Check if test database setup is needed
+        self.log("Checking test database setup...", "INFO")
+        if not os.getenv("SKIP_DB_SETUP"):
+            # Try PostgreSQL first
+            pg_check = self.run_command("pg_isready -q", "postgresql_check", timeout=5)
+            if pg_check:
+                setup_db_cmd = "bash scripts/setup_test_db.sh"
+                db_setup_success = self.run_command(setup_db_cmd, "test_db_setup", timeout=30)
+                
+                if not db_setup_success:
+                    self.log("PostgreSQL test database setup failed, falling back to SQLite for tests", "WARNING")
+                    test_env = "export TEST_DATABASE_URL='sqlite:///./test_trading_bot.db' && "
+                else:
+                    # PostgreSQL setup successful
+                    test_env = "export TEST_DATABASE_URL='postgresql+asyncpg://test_user:test_pass@localhost:5432/test_trading_bot' && "
+            else:
+                self.log("PostgreSQL not available, using SQLite for tests only", "WARNING")
+                test_env = "export TEST_DATABASE_URL='sqlite:///./test_trading_bot.db' && "
+        else:
+            self.log("Skipping test database setup (SKIP_DB_SETUP is set)", "INFO")
+            test_env = ""
+        
+        # Add other test environment variables
+        test_env += "export OPENALGO_API_URL='http://localhost:5000/api/v1' && " \
+                    "export OPENALGO_API_KEY='test_api_key' && " \
+                    "export OPENALGO_WEBSOCKET_URL='ws://localhost:5000/ws' && " \
+                    "export ENVIRONMENT='test' && "
+        
+        # Run different test categories
+        test_categories = [
+            ("Unit Tests", f"{test_env}python -m pytest tests/unit -v --tb=short", 60),
+            ("Integration Tests", f"{test_env}python -m pytest tests/integration -v --tb=short", 120),
+            ("Bot Validation", f"{test_env}python tests/validation/test_trading_bots.py", 30),
+            ("Performance Tests", f"{test_env}python -m pytest tests/performance -v --tb=short", 60)
+        ]
+        
+        all_passed = True
+        for test_name, test_cmd, timeout in test_categories:
+            self.log(f"Running {test_name}...", "INFO")
+            success = self.run_command(test_cmd, f"tests_{test_name.lower().replace(' ', '_')}", timeout=timeout)
+            if not success:
+                self.log(f"{test_name} failed, but continuing...", "WARNING")
+                all_passed = False
+        
+        # Generate coverage report
+        self.log("Generating coverage report...", "INFO")
+        coverage_cmd = f"{test_env}python -m pytest --cov=src --cov-report=term --cov-report=html --tb=no -q"
+        self.run_command(coverage_cmd, "coverage_report", timeout=180)
+        
+        return all_passed
     
     def step_4_train_model(self):
-        """Step 4: Train/update ML models"""
-        self.log("STEP 4: Model Training", "INFO")
+        """Step 4: Train/update ML models (including ML ensemble)"""
+        self.log("STEP 4: Model Training (Traditional + ML Ensemble)", "INFO")
         
         # Check if we should skip training (if recent model exists)
         try:
@@ -140,23 +191,121 @@ class DeploymentPipeline:
                     days_old = (datetime.now() - train_date).days
                     
                     if days_old < 7:
-                        self.log(f"Model is recent ({days_old} days old), skipping training", "SUCCESS")
-                        self.results['steps']['model_training'] = {
-                            'status': 'skipped',
-                            'reason': f'Recent model ({days_old} days old)'
-                        }
-                        return True
+                        # Check if ML ensemble was trained
+                        has_ml_ensemble = 'ml_ensemble_performance' in report and report['ml_ensemble_performance']
+                        
+                        if has_ml_ensemble:
+                            self.log(f"Model is recent ({days_old} days old) with ML ensemble, skipping training", "SUCCESS")
+                            self.results['steps']['model_training'] = {
+                                'status': 'skipped',
+                                'reason': f'Recent model with ML ensemble ({days_old} days old)'
+                            }
+                            return True
+                        else:
+                            self.log(f"Model is recent but missing ML ensemble, will retrain", "WARNING")
             
-            self.log("Running model training pipeline", "WARNING")
-            return self.run_command("python src/optimization/model_training_pipeline.py", "model_training", timeout=600)
+            self.log("Running model training pipeline with ML ensemble", "WARNING")
+            return self.run_command("python src/optimization/model_training_pipeline.py", "model_training", timeout=900)
             
         except Exception as e:
             self.log(f"Model training check failed: {e}", "WARNING")
-            return self.run_command("python src/optimization/model_training_pipeline.py", "model_training", timeout=600)
+            return self.run_command("python src/optimization/model_training_pipeline.py", "model_training", timeout=900)
     
-    def step_5_generate_reports(self):
-        """Step 5: Generate performance reports and visualizations"""
-        self.log("STEP 5: Performance Reports", "INFO")
+    def step_5_validate_bots(self):
+        """Step 5: Validate trading bots functionality"""
+        self.log("STEP 5: Bot Validation", "INFO")
+        
+        # Run bot validation tests
+        return self.run_command("python tests/validation/test_trading_bots.py", "bot_validation", timeout=120)
+    
+    def step_7_functional_tests(self):
+        """Step 7: Run functional tests with realistic parameters"""
+        self.log("STEP 7: Functional Tests", "INFO")
+        
+        # Create functional test script if it doesn't exist
+        functional_test_content = '''#!/usr/bin/env python3
+"""Functional tests for core system components"""
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
+# Test indicators with realistic data
+def test_indicators():
+    from src.indicators.momentum import MomentumIndicators
+    from src.indicators.volatility import VolatilityIndicators
+    
+    # Create realistic market data
+    dates = pd.date_range(end=datetime.now(), periods=100, freq='5min')
+    prices = 20000 + np.cumsum(np.random.randn(100) * 50)
+    
+    data = pd.DataFrame({
+        'open': prices + np.random.uniform(-10, 10, 100),
+        'high': prices + np.random.uniform(10, 30, 100),
+        'low': prices - np.random.uniform(10, 30, 100),
+        'close': prices,
+        'volume': np.random.randint(100000, 300000, 100).astype(float)
+    }, index=dates)
+    
+    # Ensure float64 types
+    for col in data.columns:
+        data[col] = data[col].astype(np.float64)
+    
+    # Test momentum
+    momentum = MomentumIndicators()
+    m_results = momentum.calculate(data)
+    print(f"✓ Momentum indicators: {len(m_results)} calculated")
+    
+    # Test volatility
+    volatility = VolatilityIndicators()
+    v_results = volatility.calculate(data)
+    print(f"✓ Volatility indicators: {len(v_results)} calculated")
+    
+    return True
+
+# Test bot initialization
+def test_bots():
+    from src.bots.momentum_rider_bot import MomentumRiderBot
+    from src.bots.short_straddle_bot import ShortStraddleBot
+    
+    print("✓ Momentum Rider Bot imported successfully")
+    print("✓ Short Straddle Bot imported successfully")
+    
+    return True
+
+if __name__ == "__main__":
+    try:
+        test_indicators()
+        test_bots()
+        print("\\n✅ All functional tests passed!")
+        sys.exit(0)
+    except Exception as e:
+        print(f"\\n❌ Functional test failed: {e}")
+        sys.exit(1)
+'''
+        
+        # Write functional test
+        import os
+        test_path = "tests/test_functional_pipeline.py"
+        with open(test_path, 'w') as f:
+            f.write(functional_test_content)
+        os.chmod(test_path, 0o755)
+        
+        # Run functional tests
+        test_env = "export DATABASE_URL='postgresql+asyncpg://test_user:test_pass@localhost:5432/test_trading_bot' && " \
+                   "export OPENALGO_API_URL='http://localhost:5000/api/v1' && " \
+                   "export OPENALGO_API_KEY='test_api_key' && " \
+                   "export OPENALGO_WEBSOCKET_URL='ws://localhost:5000/ws' && " \
+                   "export ENVIRONMENT='test' && "
+        
+        return self.run_command(f"{test_env}python {test_path}", "functional_tests", timeout=60)
+    
+    def step_6_generate_reports(self):
+        """Step 6: Generate performance reports and visualizations"""
+        self.log("STEP 6: Performance Reports", "INFO")
         
         # Generate performance visualizations
         success = self.run_command("python reports/visualize_performance.py", "visualizations")
@@ -247,7 +396,9 @@ class DeploymentPipeline:
             ("System Validation", self.step_2_validate_system),
             ("Test Suite", self.step_3_run_tests),
             ("Model Training", self.step_4_train_model),
-            ("Performance Reports", self.step_5_generate_reports)
+            ("Bot Validation", self.step_5_validate_bots),
+            ("Functional Tests", self.step_7_functional_tests),
+            ("Performance Reports", self.step_6_generate_reports)
         ]
         
         all_success = True
@@ -259,11 +410,18 @@ class DeploymentPipeline:
                     all_success = False
                     self.log(f"Pipeline step failed: {step_name}", "ERROR")
                     
-                    # Ask if user wants to continue
-                    response = input(f"\nStep '{step_name}' failed. Continue with next steps? (y/N): ")
-                    if response.lower() != 'y':
-                        self.log("Pipeline aborted by user", "WARNING")
-                        break
+                    # In non-interactive mode or when running from scripts, continue
+                    if os.environ.get('CI') or not sys.stdin.isatty():
+                        self.log(f"Step '{step_name}' failed, continuing in non-interactive mode", "WARNING")
+                    else:
+                        # Ask if user wants to continue
+                        try:
+                            response = input(f"\nStep '{step_name}' failed. Continue with next steps? (y/N): ")
+                            if response.lower() != 'y':
+                                self.log("Pipeline aborted by user", "WARNING")
+                                break
+                        except EOFError:
+                            self.log("No input available, continuing...", "WARNING")
                         
             except KeyboardInterrupt:
                 self.log("Pipeline interrupted by user", "WARNING")
@@ -291,6 +449,8 @@ def main():
             print("  validate   - Run system validation only")
             print("  test       - Run test suite only")
             print("  train      - Run model training only")
+            print("  bots       - Validate trading bots only")
+            print("  functional - Run functional tests only")
             print("  report     - Generate reports only")
             print("  full       - Run complete pipeline (default)")
             return
@@ -307,8 +467,12 @@ def main():
             success = pipeline.step_3_run_tests()
         elif step == 'train':
             success = pipeline.step_4_train_model()
+        elif step == 'bots':
+            success = pipeline.step_5_validate_bots()
+        elif step == 'functional':
+            success = pipeline.step_7_functional_tests()
         elif step == 'report':
-            success = pipeline.step_5_generate_reports()
+            success = pipeline.step_6_generate_reports()
         else:
             print(f"Unknown step: {step}")
             return

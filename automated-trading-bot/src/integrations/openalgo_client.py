@@ -10,9 +10,13 @@ from typing import Dict, Any, List, Optional, Callable
 from datetime import datetime, timedelta
 import httpx
 import websockets
-from websockets.exceptions import WebSocketException
+from websockets.exceptions import WebSocketException, ConnectionClosed
 import pandas as pd
 from ..utils.logger import TradingLogger
+from ..core.exceptions import (
+    OpenAlgoException, WebSocketConnectionException, APIRateLimitException,
+    AuthenticationException, handle_exception
+)
 
 
 class OpenAlgoClient:
@@ -81,7 +85,7 @@ class OpenAlgoClient:
     # REST API Methods
     
     async def _request(self, endpoint: str, data: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Make HTTP POST request with retry logic"""
+        """Make HTTP POST request with retry logic and specific exception handling"""
         last_exception = None
         
         # All OpenAlgo API calls are POST requests and require apikey in body
@@ -92,26 +96,86 @@ class OpenAlgoClient:
             try:
                 response = await self.http_client.post(endpoint, json=request_data)
                 response.raise_for_status()
-                return response.json()
+                
+                # Parse response
+                response_data = response.json()
+                
+                # Check for API-level errors in response
+                if isinstance(response_data, dict) and response_data.get('status') == 'error':
+                    error_msg = response_data.get('message', 'Unknown API error')
+                    if 'authentication' in error_msg.lower() or 'invalid api key' in error_msg.lower():
+                        raise AuthenticationException('OpenAlgo', error_msg)
+                    else:
+                        raise OpenAlgoException(endpoint, response.status_code, error_msg, 'API request')
+                
+                return response_data
                 
             except httpx.HTTPStatusError as e:
-                if e.response.status_code == 429:  # Rate limit
-                    wait_time = min(2 ** attempt, 30)
-                    self.logger.warning(f"Rate limited, waiting {wait_time}s", 
+                if e.response.status_code == 401:
+                    # Authentication error
+                    raise AuthenticationException('OpenAlgo', f"HTTP {e.response.status_code}")
+                elif e.response.status_code == 429:
+                    # Rate limit - try to extract retry-after header
+                    retry_after = e.response.headers.get('retry-after')
+                    if retry_after:
+                        try:
+                            retry_after = int(retry_after)
+                        except ValueError:
+                            retry_after = None
+                    
+                    if attempt < self.retry_attempts - 1:
+                        wait_time = retry_after or min(2 ** attempt, 30)
+                        self.logger.warning(f"Rate limited, waiting {wait_time}s", 
+                                          endpoint=endpoint, attempt=attempt)
+                        await asyncio.sleep(wait_time)
+                        continue
+                    else:
+                        raise APIRateLimitException('OpenAlgo', 100, '1min', retry_after)
+                elif e.response.status_code >= 500:
+                    # Server error - retry
+                    last_exception = OpenAlgoException(
+                        endpoint, e.response.status_code, 
+                        f"Server error: {e.response.text[:200]}", 'HTTP request'
+                    )
+                else:
+                    # Client error - don't retry
+                    raise OpenAlgoException(
+                        endpoint, e.response.status_code, 
+                        f"Client error: {e.response.text[:200]}", 'HTTP request'
+                    )
+                    
+            except httpx.TimeoutException as e:
+                last_exception = OpenAlgoException(
+                    endpoint, None, f"Request timeout: {str(e)}", 'HTTP request'
+                )
+                if attempt < self.retry_attempts - 1:
+                    wait_time = min(2 ** attempt, 10)
+                    self.logger.warning(f"Request timeout, retrying in {wait_time}s", 
                                       endpoint=endpoint, attempt=attempt)
                     await asyncio.sleep(wait_time)
-                else:
-                    raise
                     
-            except (httpx.RequestError, httpx.TimeoutException) as e:
-                last_exception = e
+            except httpx.RequestError as e:
+                last_exception = OpenAlgoException(
+                    endpoint, None, f"Request error: {str(e)}", 'HTTP request'
+                )
                 if attempt < self.retry_attempts - 1:
                     wait_time = min(2 ** attempt, 10)
                     self.logger.warning(f"Request failed, retrying in {wait_time}s", 
                                       endpoint=endpoint, error=str(e), attempt=attempt)
                     await asyncio.sleep(wait_time)
+            
+            except json.JSONDecodeError as e:
+                # Response parsing error - don't retry
+                raise OpenAlgoException(
+                    endpoint, response.status_code if 'response' in locals() else None,
+                    f"Invalid JSON response: {str(e)}", 'Response parsing'
+                )
         
-        raise last_exception or Exception("Request failed")
+        # All retries exhausted
+        if last_exception:
+            raise last_exception
+        else:
+            raise OpenAlgoException(endpoint, None, "All retry attempts failed", 'HTTP request')
     
     async def get_quote(self, symbol: str, exchange: str = "NSE") -> Dict[str, Any]:
         """Get real-time quote for a symbol"""
@@ -269,7 +333,7 @@ class OpenAlgoClient:
     # WebSocket Methods
     
     async def connect_websocket(self):
-        """Connect to WebSocket for live data"""
+        """Connect to WebSocket for live data with specific exception handling"""
         self.logger.info("Connecting to WebSocket", url=self.ws_url)
         
         try:
@@ -286,9 +350,24 @@ class OpenAlgoClient:
             # Start listening for messages
             asyncio.create_task(self._ws_message_handler())
             
+        except websockets.InvalidURI as e:
+            raise WebSocketConnectionException(self.ws_url, f"Invalid WebSocket URL: {str(e)}")
+        except websockets.InvalidHandshake as e:
+            if "401" in str(e) or "unauthorized" in str(e).lower():
+                raise AuthenticationException('OpenAlgo WebSocket', f"WebSocket authentication failed: {str(e)}")
+            else:
+                raise WebSocketConnectionException(self.ws_url, f"WebSocket handshake failed: {str(e)}")
+        except ConnectionRefusedError as e:
+            raise WebSocketConnectionException(self.ws_url, f"Connection refused: {str(e)}")
+        except OSError as e:
+            # Network-related errors
+            raise WebSocketConnectionException(self.ws_url, f"Network error: {str(e)}")
+        except asyncio.TimeoutError as e:
+            raise WebSocketConnectionException(self.ws_url, f"Connection timeout: {str(e)}")
         except Exception as e:
-            self.logger.error("WebSocket connection failed", error=str(e))
-            raise
+            # Catch-all for unexpected errors
+            self.logger.error("Unexpected WebSocket connection error", error=str(e), error_type=type(e).__name__)
+            raise WebSocketConnectionException(self.ws_url, f"Unexpected error: {str(e)}")
     
     async def _ws_message_handler(self):
         """Handle incoming WebSocket messages"""
@@ -308,8 +387,8 @@ class OpenAlgoClient:
                     except json.JSONDecodeError:
                         self.logger.error("Invalid WebSocket message", message=message)
                         
-            except WebSocketException as e:
-                self.logger.error("WebSocket error", error=str(e))
+            except ConnectionClosed as e:
+                self.logger.warning(f"WebSocket connection closed: {e.code} - {e.reason}")
                 reconnect_attempts += 1
                 
                 if reconnect_attempts < self.ws_max_reconnect_attempts:
@@ -320,7 +399,37 @@ class OpenAlgoClient:
                     self.ws_connection = None
                 else:
                     self.logger.error("Max WebSocket reconnection attempts reached")
-                    break
+                    raise WebSocketConnectionException(
+                        self.ws_url, 
+                        f"Connection closed after {reconnect_attempts} attempts: {e.code} - {e.reason}",
+                        reconnect_attempts
+                    )
+                    
+            except WebSocketException as e:
+                self.logger.error("WebSocket protocol error", error=str(e))
+                reconnect_attempts += 1
+                
+                if reconnect_attempts < self.ws_max_reconnect_attempts:
+                    wait_time = min(self.ws_reconnect_delay * reconnect_attempts, 60)
+                    self.logger.info(f"Reconnecting WebSocket in {wait_time}s", 
+                                   attempt=reconnect_attempts)
+                    await asyncio.sleep(wait_time)
+                    self.ws_connection = None
+                else:
+                    self.logger.error("Max WebSocket reconnection attempts reached")
+                    raise WebSocketConnectionException(
+                        self.ws_url, 
+                        f"Protocol error after {reconnect_attempts} attempts: {str(e)}",
+                        reconnect_attempts
+                    )
+                    
+            except Exception as e:
+                self.logger.error("Unexpected WebSocket error", error=str(e), error_type=type(e).__name__)
+                raise WebSocketConnectionException(
+                    self.ws_url, 
+                    f"Unexpected error in message handler: {str(e)}",
+                    reconnect_attempts
+                )
     
     async def _process_ws_message(self, data: Dict[str, Any]):
         """Process WebSocket message and distribute to callbacks"""
@@ -341,7 +450,11 @@ class OpenAlgoClient:
                 else:
                     await asyncio.get_event_loop().run_in_executor(None, callback, data)
             except Exception as e:
-                self.logger.error("WebSocket callback error", error=str(e))
+                self.logger.error("WebSocket callback error", 
+                                error=str(e), 
+                                callback=callback.__name__ if hasattr(callback, '__name__') else str(callback),
+                                message_type=msg_type,
+                                symbol=symbol)
     
     async def subscribe_market_data(self, symbols: List[str], feed_type: str = "ltp",
                                    callback: Callable = None):

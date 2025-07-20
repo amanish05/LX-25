@@ -2,9 +2,16 @@
   "ml_performance": [
     {
       "filename": "ml_trained_vs_actual_performance.png",
-      "hash": "114cca19e083e77668e6abc3ac988976",
-      "created": "2025-07-19T00:30:18.641046",
-      "size": 1137548,
+      "hash": "1c8d73b047bd49ab79df011af93e3f7f",
+      "created": "2025-07-19T19:26:52.016021",
+      "size": 1139913,
+      "performance_score": 0.9200000000000002
+    },
+    {
+      "filename": "ml_trained_vs_actual_performance.png",
+      "hash": "8edac4fbe3e06af1702a696a77bb0c6c",
+      "created": "2025-07-19T18:35:35.392089",
+      "size": 1137549,
       "performance_score": 0.9200000000000002
     }
   ],
@@ -27,6 +34,13 @@
   "detailed_metrics": [
     {
       "filename": "detailed_performance_metrics.png",
+      "hash": "51522fc8ca87895caf308de5600adb4e",
+      "created": "2025-07-19T18:35:33.895210",
+      "size": 541855,
+      "performance_score": 33.275
+    },
+    {
+      "filename": "detailed_performance_metrics.png",
       "hash": "77f625dfbc266a2e840e381d9007126f",
       "created": "2025-07-19T00:30:17.083951",
       "size": 541854,
@@ -34,6 +48,13 @@
     }
   ],
   "training_comparison": [
+    {
+      "filename": "training_vs_actual_performance.png",
+      "hash": "2c9adb602bec1e8cdd7593ad6dc930f6",
+      "created": "2025-07-19T18:35:33.580562",
+      "size": 842421,
+      "performance_score": 33.275
+    },
     {
       "filename": "training_vs_actual_performance.png",
       "hash": "54f5d37aaf777d60d5b4da1b4d608be2",

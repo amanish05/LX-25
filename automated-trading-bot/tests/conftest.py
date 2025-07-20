@@ -22,7 +22,7 @@ sys.path.insert(0, str(project_root))
 from src.core.database import DatabaseManager, Base
 from src.core.bot_manager import BotManager
 from src.integrations.openalgo_client import OpenAlgoClient
-from src.config import ConfigManager, get_config_manager
+from src.config.config_manager import ConfigManager, get_config_manager
 from src.bots.base_bot import BotState
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 
@@ -42,22 +42,28 @@ def event_loop():
 @pytest.fixture(scope="function")
 async def test_db():
     """Create a test database for each test"""
-    # Create temporary database
-    db_file = tempfile.NamedTemporaryFile(delete=False, suffix='.db')
-    db_path = db_file.name
-    db_file.close()
+    # Check if test database URL is provided
+    test_db_url = os.getenv("TEST_DATABASE_URL", 
+                           "postgresql+asyncpg://test_user:test_pass@localhost:5432/test_trading_bot")
     
-    # Create engine and tables
-    engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}")
+    # Create engine
+    engine = create_async_engine(test_db_url, echo=False)
     
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    
-    yield db_path
-    
-    # Cleanup
-    await engine.dispose()
-    os.unlink(db_path)
+    try:
+        # Create all tables
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
+        
+        yield test_db_url
+        
+    finally:
+        # Cleanup - drop all tables
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+        
+        # Dispose engine
+        await engine.dispose()
 
 
 @pytest.fixture
@@ -79,8 +85,8 @@ def test_config(test_db):
             "openalgo_api_version": "v1",
             "websocket_host": "ws://127.0.0.1",
             "websocket_port": 8765,
-            "database_type": "sqlite",
-            "database_connection": {"path": test_db}
+            "database_type": "postgresql",
+            "database_connection": {}
         },
         "api": {
             "host": "127.0.0.1",

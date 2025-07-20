@@ -246,20 +246,25 @@ class OrderBlocks(BaseIndicator):
         if not block.mitigated or block.mitigation_index is None:
             return False
         
-        # Check price action after mitigation
-        if block.mitigation_index + 5 < len(data):
-            post_mitigation_data = data.iloc[block.mitigation_index:block.mitigation_index + 5]
+        # Check price action after mitigation - need at least 1 bar after mitigation
+        if block.mitigation_index < len(data) - 1:
+            # Look at all price action after mitigation
+            post_mitigation_data = data.iloc[block.mitigation_index + 1:]
             
-            if block.type == 'bullish':
-                # Bullish OB becomes bearish breaker if price continues lower
-                if post_mitigation_data['close'].iloc[-1] < block.bottom * 0.995:
-                    block.breaker_block = True
-                    return True
-            else:
-                # Bearish OB becomes bullish breaker if price continues higher  
-                if post_mitigation_data['close'].iloc[-1] > block.top * 1.005:
-                    block.breaker_block = True
-                    return True
+            if len(post_mitigation_data) > 0:
+                # Get the most recent close price
+                latest_close = post_mitigation_data['close'].iloc[-1]
+                
+                if block.type == 'bullish':
+                    # Bullish OB becomes bearish breaker if price continues lower
+                    if latest_close < block.bottom * 0.995:
+                        block.breaker_block = True
+                        return True
+                else:
+                    # Bearish OB becomes bullish breaker if price continues higher  
+                    if latest_close > block.top * 1.005:
+                        block.breaker_block = True
+                        return True
         
         return False
     

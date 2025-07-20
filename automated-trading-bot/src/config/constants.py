@@ -129,7 +129,7 @@ class SystemConstants:
     # File paths
     DEFAULT_CONFIG_FILE = "config/config.json"
     DEFAULT_LOG_FILE = "logs/trading_bot.log"
-    DEFAULT_DB_PATH = "data/trading_bot.db"
+    DEFAULT_DB_PATH = "postgresql://localhost/trading_bot"  # PostgreSQL only - use DATABASE_URL env var
     
     # Performance
     MAX_CONCURRENT_ORDERS = 10

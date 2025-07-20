@@ -1,0 +1,86 @@
+{
+  "pipeline_start": "2025-07-19T22:38:38.590002",
+  "steps": {
+    "optimization": {
+      "status": "skipped",
+      "reason": "Recent optimization (0 days old)"
+    },
+    "validation": {
+      "status": "success",
+      "duration": 0.7517011165618896,
+      "output": "\n  Risk Management: Conservative (1.5+ R:R minimum)\n\n\ud83d\udcdd Generating Validation Report...\n\ud83d\udcc4 Validation report saved to reports/system_validation_report.md\n\n============================================================\n\ud83c\udf89 SYSTEM VALIDATION COMPLETE - ALL TESTS PASSED!\n\ud83d\udfe2 SYSTEM IS READY FOR DEPLOYMENT\n============================================================\n\n\ud83d\udccb Next Steps:\n1. Review validation report\n2. Start paper trading validation\n3. Monitor performance metrics\n4. Fine-tune based on live results\n"
+    },
+    "postgresql_check": {
+      "status": "success",
+      "duration": 0.018551111221313477,
+      "output": ""
+    },
+    "test_db_setup": {
+      "status": "success",
+      "duration": 0.27632904052734375,
+      "output": " database if exists...\nDROP DATABASE\nDROP ROLE\nCreating test user...\nCREATE ROLE\nCreating test database...\nCREATE DATABASE\nGRANT\n\u2705 Test database setup complete!\n\nTest Database Configuration:\n  Database: test_trading_bot\n  User: test_user\n  Password: test_pass\n\nTo use this database in tests, set:\n  export DATABASE_URL='postgresql://test_user:test_pass@localhost:5432/test_trading_bot'\n\nOr for asyncpg:\n  export DATABASE_URL='postgresql+asyncpg://test_user:test_pass@localhost:5432/test_trading_bot'\n"
+    },
+    "tests_unit_tests": {
+      "status": "success",
+      "duration": 17.025004863739014,
+      "output": "utils/logger.py                              74     49    34%   24-47, 55-125, 132-133, 137-141, 146, 161, 174, 187, 200, 204, 208, 212\n---------------------------------------------------------------------------\nTOTAL                                          9471   5522    42%\nCoverage HTML written to dir htmlcov\nCoverage XML written to file coverage.xml\nRequired test coverage of 20% reached. Total coverage: 41.70%\n================= 110 passed, 3 skipped, 6 warnings in 10.71s ==================\n"
+    },
+    "tests_integration_tests": {
+      "status": "failed",
+      "duration": 32.916369915008545,
+      "error": ""
+    },
+    "tests_bot_validation": {
+      "status": "success",
+      "duration": 3.559753894805908,
+      "output": "=====================\n\u2705 Price Action Composite: PASSED\n   Details: 0 signals found\n\u2705 Momentum Rider Bot: PASSED\n   Details: Module loaded and indicators working\n\u2705 Short Straddle Bot: PASSED\n   Details: Module loaded and indicators working\n\u2705 Bot Registry: PASSED\n   Details: 4/4 bots imported\n\n------------------------------------------------------------\nTotal Tests: 4\nPassed: 4\nFailed: 0\n\n\u2705 ALL TESTS PASSED - BOTS ARE READY FOR TRADING!\n============================================================\n"
+    },
+    "tests_performance_tests": {
+      "status": "failed",
+      "duration": 6.392953157424927,
+      "error": ""
+    },
+    "coverage_report": {
+      "status": "failed",
+      "duration": 6.6750710010528564,
+      "error": ""
+    },
+    "model_training": {
+      "status": "skipped",
+      "reason": "Recent model with ML ensemble (0 days old)"
+    },
+    "bot_validation": {
+      "status": "success",
+      "duration": 3.3262619972229004,
+      "output": "=====================\n\u2705 Price Action Composite: PASSED\n   Details: 0 signals found\n\u2705 Momentum Rider Bot: PASSED\n   Details: Module loaded and indicators working\n\u2705 Short Straddle Bot: PASSED\n   Details: Module loaded and indicators working\n\u2705 Bot Registry: PASSED\n   Details: 4/4 bots imported\n\n------------------------------------------------------------\nTotal Tests: 4\nPassed: 4\nFailed: 0\n\n\u2705 ALL TESTS PASSED - BOTS ARE READY FOR TRADING!\n============================================================\n"
+    },
+    "functional_tests": {
+      "status": "success",
+      "duration": 3.214459180831909,
+      "output": "\u2713 Momentum indicators: 7 calculated\n\u2713 Volatility indicators: 7 calculated\n\u2713 Momentum Rider Bot imported successfully\n\u2713 Short Straddle Bot imported successfully\n\n\u2705 All functional tests passed!\n"
+    },
+    "visualizations": {
+      "status": "success",
+      "duration": 1.741330862045288,
+      "output": "Performance visualization saved to reports/training_vs_actual_performance.png\nDetailed metrics saved to reports/detailed_performance_metrics.png\n"
+    },
+    "ml_visualizations": {
+      "status": "success",
+      "duration": 1.5764679908752441,
+      "output": "ML performance visualization saved to reports/ml_trained_vs_actual_performance.png\n"
+    },
+    "report_cleanup": {
+      "status": "success",
+      "duration": 0.03044605255126953,
+      "output": "y...\n\nCurrent Reports:\n\nml_performance:\n  Files: 2\n    - ml_trained_vs_actual_performance.png\n    - ml_trained_vs_actual_performance.png\n\ngeneral_performance:\n  Files: 2\n    - indicator_performance_heatmap.png\n    - enhanced_system_performance.png\n\ndetailed_metrics:\n  Files: 2\n    - detailed_performance_metrics.png\n    - detailed_performance_metrics.png\n\ntraining_comparison:\n  Files: 2\n    - training_vs_actual_performance.png\n    - training_vs_actual_performance.png\n\nReport versioning complete!\n"
+    }
+  },
+  "pipeline_end": "2025-07-19T22:39:56.097614",
+  "total_duration": 77.507615,
+  "summary": {
+    "total_steps": 15,
+    "successful_steps": 10,
+    "failed_steps": 3,
+    "success_rate": "66.7%"
+  }
+}

@@ -206,9 +206,6 @@ git pull origin main
 
 # Update dependencies
 pip install -r requirements.txt --upgrade
-
-# Run migrations if any
-python scripts/migrate.py
 ```
 
 ---

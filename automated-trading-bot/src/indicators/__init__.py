@@ -4,15 +4,14 @@ Modular system for calculating various technical indicators
 """
 
 from .base import BaseIndicator, IndicatorResult
-from .trend import TrendIndicators
+# Removed unused: TrendIndicators, VolumeIndicators, CompositeIndicators
 from .momentum import MomentumIndicators
 from .volatility import VolatilityIndicators
-from .volume import VolumeIndicators
-from .composite import CompositeIndicators
 from .rsi_advanced import AdvancedRSI
 from .oscillator_matrix import OscillatorMatrix
 from .advanced_confirmation import AdvancedConfirmationSystem
 from .signal_validator import SignalValidator
+from .reversal_signals import ReversalSignal as ReversalSignals
 
 # LuxAlgo Price Action Indicators
 from .market_structure import MarketStructure
@@ -25,16 +24,16 @@ from .price_action_composite import PriceActionComposite
 __all__ = [
     'BaseIndicator',
     'IndicatorResult',
-    'TrendIndicators',
+    # Core indicators still in use
     'MomentumIndicators',
     'VolatilityIndicators',
-    'VolumeIndicators',
-    'CompositeIndicators',
+    # Enhanced indicators
     'AdvancedRSI',
     'OscillatorMatrix',
     'AdvancedConfirmationSystem',
     'SignalValidator',
-    # Price Action
+    'ReversalSignals',
+    # Price Action (to be ML-enhanced)
     'MarketStructure',
     'OrderBlocks',
     'FairValueGaps',

@@ -1,0 +1,82 @@
+{
+  "lookback_periods": {
+    "short": 20,
+    "medium": 50,
+    "long": 200
+  },
+  "volatility_thresholds": {
+    "low": 0.10,
+    "medium": 0.20,
+    "high": 0.35,
+    "extreme": 0.50
+  },
+  "trend_thresholds": {
+    "strong": 0.7,
+    "moderate": 0.4,
+    "weak": 0.2
+  },
+  "iv_rank_thresholds": {
+    "low": 30,
+    "medium": 50,
+    "high": 70
+  },
+  "bot_suitability": {
+    "trending_up": {
+      "momentum_rider": 0.9,
+      "volatility_expander": 0.3,
+      "short_straddle": 0.2,
+      "iron_condor": 0.3
+    },
+    "trending_down": {
+      "momentum_rider": 0.9,
+      "volatility_expander": 0.3,
+      "short_straddle": 0.2,
+      "iron_condor": 0.3
+    },
+    "ranging": {
+      "momentum_rider": 0.3,
+      "volatility_expander": 0.4,
+      "short_straddle": 0.8,
+      "iron_condor": 0.9
+    },
+    "volatile": {
+      "momentum_rider": 0.6,
+      "volatility_expander": 0.7,
+      "short_straddle": 0.5,
+      "iron_condor": 0.4
+    },
+    "calm": {
+      "momentum_rider": 0.4,
+      "volatility_expander": 0.9,
+      "short_straddle": 0.7,
+      "iron_condor": 0.8
+    }
+  },
+  "performance_adjustments": {
+    "iv_impact": {
+      "short_straddle": {
+        "high_iv_bonus": 1.3,
+        "low_iv_penalty": 0.5
+      },
+      "volatility_expander": {
+        "low_iv_bonus": 1.4,
+        "high_iv_penalty": 0.4
+      }
+    },
+    "volatility_impact": {
+      "extreme": {
+        "option_selling_penalty": 0.6,
+        "momentum_bonus": 1.1
+      }
+    }
+  },
+  "risk_categories": {
+    "momentum_rider": "medium",
+    "volatility_expander": "medium",
+    "short_straddle": "high",
+    "iron_condor": "low"
+  },
+  "minimum_confidence_threshold": 0.5,
+  "regime_change_cooldown_minutes": 30,
+  "last_updated": "2025-07-19"
+}

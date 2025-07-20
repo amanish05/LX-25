@@ -146,7 +146,7 @@ class DatabaseConfig:
     
     def get_database_specific_types(self) -> Dict[str, Any]:
         """
-        Get database-specific column types for migrations
+        Get database-specific column types
         
         Returns:
             Dictionary mapping generic types to database-specific types
@@ -184,34 +184,3 @@ class DatabaseConfig:
 def get_database_config(database_url: Optional[str] = None) -> DatabaseConfig:
     """Factory function to get database configuration"""
     return DatabaseConfig(database_url)
-
-
-# Migration helpers
-def get_postgresql_migration_sql() -> Dict[str, str]:
-    """Get PostgreSQL-specific SQL for migrations"""
-    return {
-        'create_extensions': """
-            CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-            CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-        """,
-        'create_indexes': """
-            -- Optimize for time-series queries
-            CREATE INDEX IF NOT EXISTS idx_trades_timestamp ON bot_trades(timestamp DESC);
-            CREATE INDEX IF NOT EXISTS idx_positions_updated ON bot_positions(updated_at DESC);
-            CREATE INDEX IF NOT EXISTS idx_performance_timestamp ON bot_performance(timestamp DESC);
-            
-            -- Optimize for bot queries
-            CREATE INDEX IF NOT EXISTS idx_trades_bot_symbol ON bot_trades(bot_name, symbol);
-            CREATE INDEX IF NOT EXISTS idx_positions_bot_symbol ON bot_positions(bot_name, symbol);
-            
-            -- Optimize for JSONB queries (PostgreSQL specific)
-            CREATE INDEX IF NOT EXISTS idx_positions_metadata ON bot_positions USING GIN (metadata);
-            CREATE INDEX IF NOT EXISTS idx_trades_metadata ON bot_trades USING GIN (metadata);
-        """,
-        'optimize_settings': """
-            -- Optimize for financial data workloads
-            ALTER TABLE bot_trades SET (autovacuum_vacuum_scale_factor = 0.01);
-            ALTER TABLE bot_positions SET (autovacuum_vacuum_scale_factor = 0.01);
-            ALTER TABLE market_data_cache SET (autovacuum_vacuum_scale_factor = 0.05);
-        """
-    }

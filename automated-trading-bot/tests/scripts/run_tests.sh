@@ -37,14 +37,17 @@ run_tests() {
 
 # Check if virtual environment is activated, if not try to activate it
 if [ -z "$VIRTUAL_ENV" ]; then
-    if [ -f "venv/bin/activate" ]; then
+    if [ -f ".venv/bin/activate" ]; then
+        echo -e "${BLUE}Activating virtual environment...${NC}"
+        source .venv/bin/activate
+    elif [ -f "venv/bin/activate" ]; then
         echo -e "${BLUE}Activating virtual environment...${NC}"
         source venv/bin/activate
     else
         echo -e "${RED}Error: Virtual environment not found${NC}"
         echo "Please create and activate your virtual environment first:"
-        echo "  python -m venv venv"
-        echo "  source venv/bin/activate"
+        echo "  python -m venv .venv"
+        echo "  source .venv/bin/activate"
         exit 1
     fi
 fi

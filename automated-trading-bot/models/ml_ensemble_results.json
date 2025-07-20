@@ -1,0 +1,27 @@
+{
+  "rsi_lstm": {
+    "error": "TensorFlow not available - used fallback implementation",
+    "fallback_used": true,
+    "status": "completed_with_fallback"
+  },
+  "pattern_cnn": {
+    "error": "TensorFlow not available - used fallback implementation",
+    "fallback_used": true,
+    "status": "completed_with_fallback"
+  },
+  "adaptive_thresholds": {
+    "error": "No module named 'ml'"
+  },
+  "indicator_ensemble": {
+    "error": "No module named 'ml'"
+  },
+  "price_action_validator": {
+    "error": "No module named 'ml'"
+  },
+  "ml_price_action_system": {
+    "error": "No module named 'ml'"
+  },
+  "confirmation_validation_system": {
+    "error": "No module named 'ml'"
+  }
+}

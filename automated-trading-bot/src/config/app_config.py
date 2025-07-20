@@ -19,12 +19,13 @@ class DomainConfig:
     openalgo_api_version: str = "v1"
     websocket_host: str = "ws://127.0.0.1"
     websocket_port: int = 8765
-    database_type: str = "sqlite"
+    database_type: str = "postgresql"  # PostgreSQL for all environments
     database_connection: Dict[str, Any] = None
     
     def __post_init__(self):
         if self.database_connection is None:
-            self.database_connection = {"path": "db/openalgo.db"}
+            # Default empty - must be provided via DATABASE_URL env var
+            self.database_connection = {}
     
     @property
     def openalgo_api_url(self) -> str:
@@ -36,17 +37,13 @@ class DomainConfig:
     
     @property
     def database_url(self) -> str:
-        if self.database_type == "sqlite":
-            path = self.database_connection.get("path", "db/openalgo.db")
-            return f"sqlite+aiosqlite:///{path}"
-        elif self.database_type == "postgresql":
+        if self.database_type == "postgresql":
             conn = self.database_connection
-            # If we have a direct URL, use it
+            # If we have a direct URL from env var, use it
             if "url" in conn:
                 return conn["url"]
-            # Otherwise build from components
-            return (f"postgresql+asyncpg://{conn['user']}:{conn['password']}@"
-                   f"{conn['host']}:{conn['port']}/{conn['database']}")
+            # Otherwise DATABASE_URL env var is required
+            raise ValueError("DATABASE_URL environment variable must be set for PostgreSQL")
         else:
             raise ValueError(f"Unsupported database type: {self.database_type}")
 

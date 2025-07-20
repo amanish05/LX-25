@@ -37,7 +37,14 @@ class OscillatorMatrix:
         Args:
             config: Configuration for individual oscillators
         """
-        self.config = config or self._default_config()
+        # Merge custom config with defaults
+        self.config = self._default_config()
+        if config:
+            for key, value in config.items():
+                if key in self.config:
+                    self.config[key].update(value)
+                else:
+                    self.config[key] = value
         
         # Oscillator weights for composite score
         self.weights = {
@@ -128,13 +135,13 @@ class OscillatorMatrix:
     
     def _calculate_rsi(self, prices: pd.Series) -> pd.Series:
         """Calculate RSI"""
-        return talib.RSI(prices.values, timeperiod=self.config['rsi']['period'])
+        return talib.RSI(prices.values.astype(np.float64), timeperiod=self.config['rsi']['period'])
     
     def _calculate_macd(self, prices: pd.Series) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Calculate MACD"""
         macd_config = self.config['macd']
         return talib.MACD(
-            prices.values,
+            prices.values.astype(np.float64),
             fastperiod=macd_config['fast'],
             slowperiod=macd_config['slow'],
             signalperiod=macd_config['signal']
@@ -144,9 +151,9 @@ class OscillatorMatrix:
         """Calculate Stochastic oscillator"""
         stoch_config = self.config['stochastic']
         k, d = talib.STOCH(
-            data['high'].values,
-            data['low'].values,
-            data['close'].values,
+            data['high'].values.astype(np.float64),
+            data['low'].values.astype(np.float64),
+            data['close'].values.astype(np.float64),
             fastk_period=stoch_config['k_period'],
             slowk_period=stoch_config['d_period'],
             slowd_period=stoch_config['d_period']
@@ -157,9 +164,9 @@ class OscillatorMatrix:
         """Calculate Commodity Channel Index"""
         period = self.config['cci']['period']
         cci_values = talib.CCI(
-            data['high'].values,
-            data['low'].values,
-            data['close'].values,
+            data['high'].values.astype(np.float64),
+            data['low'].values.astype(np.float64),
+            data['close'].values.astype(np.float64),
             timeperiod=period
         )
         return pd.Series(cci_values, index=data.index)
@@ -168,9 +175,9 @@ class OscillatorMatrix:
         """Calculate Williams %R"""
         period = self.config['williams_r']['period']
         willr = talib.WILLR(
-            data['high'].values,
-            data['low'].values,
-            data['close'].values,
+            data['high'].values.astype(np.float64),
+            data['low'].values.astype(np.float64),
+            data['close'].values.astype(np.float64),
             timeperiod=period
         )
         return pd.Series(willr, index=data.index)
@@ -178,12 +185,12 @@ class OscillatorMatrix:
     def _calculate_momentum(self, prices: pd.Series) -> pd.Series:
         """Calculate Momentum"""
         period = self.config['momentum']['period']
-        return pd.Series(talib.MOM(prices.values, timeperiod=period), index=prices.index)
+        return pd.Series(talib.MOM(prices.values.astype(np.float64), timeperiod=period), index=prices.index)
     
     def _calculate_roc(self, prices: pd.Series) -> pd.Series:
         """Calculate Rate of Change"""
         period = self.config['roc']['period']
-        return pd.Series(talib.ROC(prices.values, timeperiod=period), index=prices.index)
+        return pd.Series(talib.ROC(prices.values.astype(np.float64), timeperiod=period), index=prices.index)
     
     def _normalize_oscillator(self, values: pd.Series, min_val: float, max_val: float,
                             new_min: float = -100, new_max: float = 100) -> pd.Series:
@@ -224,13 +231,21 @@ class OscillatorMatrix:
         Returns:
             Composite score series (-100 to +100)
         """
-        composite = pd.Series(0, index=oscillators.index)
+        composite = pd.Series(0.0, index=oscillators.index)
+        valid_data_count = pd.Series(0, index=oscillators.index)
         
-        # Add weighted contributions
+        # Add weighted contributions and track valid data points
         for osc, weight in self.weights.items():
             col_name = f"{osc}_normalized"
             if col_name in oscillators.columns:
-                composite += oscillators[col_name].fillna(0) * weight
+                osc_values = oscillators[col_name]
+                # Only add values that are not NaN
+                valid_mask = ~osc_values.isna()
+                composite[valid_mask] += osc_values[valid_mask] * weight
+                valid_data_count[valid_mask] += 1
+        
+        # Set composite to NaN where we have no valid oscillator data
+        composite[valid_data_count == 0] = np.nan
         
         return composite
     
@@ -245,6 +260,10 @@ class OscillatorMatrix:
         Returns:
             List of oscillator signals
         """
+        # Handle empty or insufficient data
+        if len(data) == 0 or 'close' not in data.columns:
+            return []
+        
         # Calculate all oscillators
         oscillators = self.calculate_all_oscillators(data)
         
@@ -466,14 +485,31 @@ class OscillatorMatrix:
         # Normalize to create weights
         total_performance = sum(max(0, perf) for perf in oscillator_performance.values())
         if total_performance > 0:
-            optimized_weights = {
-                osc: max(0.05, perf / total_performance)  # Minimum 5% weight
+            # Calculate raw weights
+            raw_weights = {
+                osc: max(0, perf) / total_performance
                 for osc, perf in oscillator_performance.items()
             }
             
-            # Ensure weights sum to 1
-            weight_sum = sum(optimized_weights.values())
-            optimized_weights = {osc: w/weight_sum for osc, w in optimized_weights.items()}
+            # Redistribute weights to ensure 5% minimum
+            min_weight = 0.05
+            num_oscillators = len(raw_weights)
+            
+            # Calculate how much weight is needed for minimums
+            total_min_weight = min_weight * num_oscillators
+            
+            if total_min_weight <= 1.0:
+                # Start with minimum weights
+                optimized_weights = {osc: min_weight for osc in raw_weights.keys()}
+                remaining_weight = 1.0 - total_min_weight
+                
+                # Distribute remaining weight proportionally to performance
+                if remaining_weight > 0:
+                    for osc, raw_weight in raw_weights.items():
+                        optimized_weights[osc] += remaining_weight * raw_weight
+            else:
+                # If we can't give everyone 5%, distribute equally
+                optimized_weights = {osc: 1.0/num_oscillators for osc in raw_weights.keys()}
         else:
             # Use default weights if optimization fails
             optimized_weights = self.weights.copy()

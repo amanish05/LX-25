@@ -1,6 +1,6 @@
 # Automated Trading Bot System
 
-A production-ready multi-strategy trading bot system that integrates with OpenAlgo for executing trades across Indian markets.
+A production-ready multi-strategy trading bot system with ML-enhanced signal generation that integrates with OpenAlgo for executing trades across Indian markets.
 
 ## System Architecture
 
@@ -72,17 +72,31 @@ This system runs as a separate application that communicates with OpenAlgo via i
   - ✅ Momentum: RSI, Stochastic, Williams %R, ROC
   - ✅ Volatility: ATR, Bollinger Bands, Keltner Channels
   - ✅ Volume: OBV, MFI, Volume MA, VWAP
+  - ✅ Price Action: Market Structure, Order Blocks, FVGs, Liquidity Zones
+
+- **ML Enhancement Features** (NEW):
+  - ✅ ML Ensemble System with Individual Indicator Intelligence
+  - ✅ RSI LSTM Model for pattern prediction
+  - ✅ Pattern CNN for chart pattern recognition
+  - ✅ Adaptive Thresholds RL for dynamic optimization
+  - ✅ ML-Enhanced Price Action Validation
+  - ✅ Advanced Confirmation System with ML weights
+  - ✅ Signal Validator with adaptive thresholds
+  - ✅ Integrated confirmation and validation pipeline
+  - ✅ Smart bot selection based on market regime
+  - ✅ Performance-based weight adjustment
+  - ✅ Model training pipeline with ensemble support
 
 ### Features Under Development 🚧
 
 - ❌ Historical data loader for training (2020-present)
-- ❌ Machine learning model training pipeline
+- ✅ Machine learning model training pipeline (Implemented)
 - ❌ Backtesting engine with walk-forward analysis
-- ❌ Parameter optimization framework
-- ❌ Real-time model inference engine
+- ✅ Parameter optimization framework (Enhanced with ML)
+- ✅ Real-time model inference engine (Implemented)
 - ❌ Advanced position sizing algorithms
 - ❌ Multi-timeframe analysis
-- ❌ Market regime detection
+- ✅ Market regime detection (Implemented)
 - ❌ Correlation analysis between bots
 - ❌ Advanced Greeks management for options
 

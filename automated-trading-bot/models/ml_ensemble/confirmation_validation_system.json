@@ -1,0 +1,13 @@
+{
+  "confirmation_performance": {
+    "status": "no_data"
+  },
+  "validation_performance": {
+    "status": "no_data"
+  },
+  "integration_stats": {
+    "signals_processed": 0,
+    "signals_approved": 0,
+    "avg_processing_time": 0.0
+  }
+}

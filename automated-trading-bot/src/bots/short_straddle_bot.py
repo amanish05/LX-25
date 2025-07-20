@@ -14,13 +14,16 @@ from ..utils.logger import TradingLogger
 
 class ShortStraddleBot(BaseBot):
     """
-    Short Straddle Strategy Bot
+    Short Straddle Strategy Bot with ML ensemble filtering
     - Sells ATM Call and Put simultaneously
     - Enters when IV Rank > threshold
+    - Uses ML ensemble to filter out bad market conditions
     - Manages risk through stop loss and profit targets
     """
     
     def __init__(self, config: Dict[str, Any], db_manager, openalgo_client, logger=None):
+        # Set bot type for ML configuration
+        config["bot_type"] = "short_straddle"
         super().__init__(config, db_manager, openalgo_client, logger)
         
         # Strategy specific parameters
@@ -38,8 +41,13 @@ class ShortStraddleBot(BaseBot):
         self.symbols = {"NIFTY", "BANKNIFTY"}
         
     async def initialize(self):
-        """Initialize the Short Straddle bot"""
+        """Initialize the Short Straddle bot with ML ensemble integration"""
         self.logger.info(f"Initializing Short Straddle Bot: {self.name}")
+        
+        # Set symbols to monitor
+        default_symbols = ["NIFTY", "BANKNIFTY"]
+        config_symbols = self.config.get('symbols', default_symbols)
+        self.symbols.update(config_symbols)
         
         # Load historical IV data for rank calculation
         self.iv_history = {}
@@ -50,7 +58,7 @@ class ShortStraddleBot(BaseBot):
         # Schedule option chain updates
         self._tasks.append(asyncio.create_task(self._update_option_chains()))
         
-        self.logger.info("Short Straddle Bot initialized")
+        self.logger.info(f"Short Straddle Bot initialized for symbols: {list(self.symbols)}")
     
     async def generate_signals(self, symbol: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Generate short straddle signals based on IV and market conditions"""
@@ -98,9 +106,20 @@ class ShortStraddleBot(BaseBot):
             # Generate signal
             total_premium = call_data["ltp"] + put_data["ltp"]
             
+            # Calculate signal strength based on multiple factors
+            signal_strength = self._calculate_straddle_strength(
+                iv_rank, total_premium, spot_price, call_data, put_data
+            )
+            
+            # Calculate traditional confidence
+            traditional_confidence = self._calculate_traditional_confidence(
+                iv_rank, call_data, put_data, total_premium
+            )
+            
             signal = {
                 "symbol": symbol,
                 "type": "SHORT_STRADDLE",
+                "action": "SELL",  # For consistency with BaseBot format
                 "expiry": expiry,
                 "strike": atm_strike,
                 "call_symbol": call_data["symbol"],
@@ -108,16 +127,26 @@ class ShortStraddleBot(BaseBot):
                 "call_price": call_data["ltp"],
                 "put_price": put_data["ltp"],
                 "total_premium": total_premium,
+                "option_price": total_premium,  # For BaseBot compatibility
+                "underlying_price": spot_price,
                 "iv_rank": iv_rank,
-                "strength": min(iv_rank / 100, 1.0),
+                "strength": signal_strength,
+                "strategy_source": "traditional",  # Will be enhanced with ML
+                "entry_time": datetime.now(),
                 "metadata": {
                     "spot_price": spot_price,
                     "call_iv": call_data.get("iv", 0),
                     "put_iv": put_data.get("iv", 0),
                     "call_oi": call_data.get("oi", 0),
                     "put_oi": put_data.get("oi", 0),
+                    "call_volume": call_data.get("volume", 0),
+                    "put_volume": put_data.get("volume", 0),
                     "profit_target": total_premium * self.profit_target,
-                    "stop_loss": total_premium * self.stop_loss_multiplier
+                    "stop_loss": total_premium * self.stop_loss_multiplier,
+                    "traditional_confidence": traditional_confidence,
+                    "iv_rank_score": iv_rank / 100,
+                    "liquidity_score": self._calculate_liquidity_score(call_data, put_data),
+                    "premium_attractiveness": self._calculate_premium_attractiveness(total_premium, spot_price)
                 }
             }
             
@@ -157,23 +186,100 @@ class ShortStraddleBot(BaseBot):
         return final_lots * lot_size
     
     async def should_enter_position(self, signal: Dict[str, Any]) -> bool:
-        """Check if all entry conditions are met"""
-        # Check market conditions
-        if not await self._check_market_conditions(signal["symbol"]):
+        """Check if all entry conditions are met with ML ensemble filtering"""
+        try:
+            # Traditional entry checks
+            if not await self._check_market_conditions(signal["symbol"]):
+                return False
+            
+            # Check for upcoming events
+            if await self._has_major_event_soon(signal["symbol"]):
+                self.logger.warning("Major event detected, skipping entry")
+                return False
+            
+            # Check realized volatility
+            realized_vol = await self._calculate_realized_volatility(signal["symbol"])
+            if realized_vol > signal["metadata"]["call_iv"] * 0.8:
+                self.logger.warning("Realized volatility too high relative to IV")
+                return False
+            
+            # ML Ensemble Filtering (key enhancement for straddle strategy)
+            if signal.get('ml_enhanced', False):
+                ensemble_confidence = signal.get('ensemble_confidence', 0)
+                consensus_ratio = signal.get('consensus_ratio', 0)
+                
+                # For straddle, we want to avoid strong directional signals
+                ensemble_metadata = signal.get('ensemble_metadata', {})
+                ml_signal_type = ensemble_metadata.get('signal_type', 'hold').upper()
+                ml_strength = ensemble_metadata.get('strength', 0)
+                
+                # Filter out strong directional ML signals (bad for straddles)
+                if ml_signal_type in ['BUY', 'SELL'] and ml_strength > 0.7:
+                    self.logger.warning(f"Strong ML directional signal detected: {ml_signal_type} "
+                                      f"(strength: {ml_strength:.2f}), avoiding straddle entry")
+                    return False
+                
+                # Check for ML conflict (different from momentum bot - here conflict might be good)
+                if signal.get('ml_conflict', False):
+                    conflict_reason = signal.get('conflict_reason', '')
+                    self.logger.info(f"ML conflict detected: {conflict_reason} - good for straddle")
+                    # ML conflict can actually be good for straddles (uncertain direction)
+                
+                # Require reasonable ML confidence for filtering
+                if ensemble_confidence < 0.3:
+                    self.logger.debug(f"Low ML ensemble confidence: {ensemble_confidence:.2f}")
+                    # Don't reject based on low confidence alone for straddles
+                
+                # Additional checks for specific ML models
+                contributing_indicators = ensemble_metadata.get('contributing_indicators', [])
+                
+                # Check for pattern recognition warnings
+                if 'pattern_cnn' in contributing_indicators:
+                    # Pattern CNN detected strong patterns might indicate breakout
+                    if ml_strength > 0.6 and ml_signal_type in ['BUY', 'SELL']:
+                        self.logger.warning("Pattern CNN detected strong directional pattern, "
+                                          "avoiding straddle entry")
+                        return False
+                
+                # Check adaptive thresholds
+                if 'adaptive_thresholds' in contributing_indicators:
+                    # If thresholds are adapting towards extreme values, avoid entry
+                    if ml_strength > 0.5:
+                        self.logger.info("Adaptive thresholds suggest changing market regime")
+                
+                self.logger.info(f"ML ensemble filter passed for straddle: "
+                                f"signal={ml_signal_type}, strength={ml_strength:.2f}, "
+                                f"confidence={ensemble_confidence:.2f}")
+            
+            # Additional straddle-specific checks
+            
+            # Check IV rank relative to ML predictions
+            iv_rank = signal.get('iv_rank', 0)
+            if iv_rank < self.iv_rank_threshold:
+                self.logger.debug(f"IV rank {iv_rank:.1f}% below threshold {self.iv_rank_threshold}%")
+                return False
+            
+            # Check position limits
+            if len(self.straddle_positions) >= self.max_positions:
+                self.logger.debug("Maximum straddle positions reached")
+                return False
+            
+            # Check available capital with margin requirements
+            margin_required = self._calculate_margin_requirement(signal)
+            if margin_required > self.available_capital * 0.8:  # Keep 20% buffer
+                self.logger.warning(f"Insufficient capital for straddle margin: "
+                                  f"{margin_required} vs {self.available_capital}")
+                return False
+            
+            self.logger.info(f"Straddle entry approved for {signal['symbol']}: "
+                           f"IV rank={iv_rank:.1f}%, premium={signal['total_premium']:.2f}, "
+                           f"ml_filtered={signal.get('ml_enhanced', False)}")
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error in should_enter_position: {e}")
             return False
-        
-        # Check for upcoming events
-        if await self._has_major_event_soon(signal["symbol"]):
-            self.logger.warning("Major event detected, skipping entry")
-            return False
-        
-        # Check realized volatility
-        realized_vol = await self._calculate_realized_volatility(signal["symbol"])
-        if realized_vol > signal["metadata"]["call_iv"] * 0.8:
-            self.logger.warning("Realized volatility too high relative to IV")
-            return False
-        
-        return True
     
     async def should_exit_position(self, position: Dict[str, Any], 
                                   current_data: Dict[str, Any]) -> bool:
@@ -467,3 +573,103 @@ class ShortStraddleBot(BaseBot):
         """Calculate days to expiry"""
         expiry_date = datetime.strptime(expiry, "%Y-%m-%d")
         return (expiry_date - datetime.now()).days
+    
+    def _calculate_straddle_strength(self, iv_rank: float, total_premium: float, 
+                                   spot_price: float, call_data: Dict, put_data: Dict) -> float:
+        """Calculate signal strength for straddle entry (0-1 scale)"""
+        try:
+            # IV rank component (higher IV rank = stronger signal)
+            iv_strength = min(iv_rank / 100, 1.0)
+            
+            # Premium component (higher premium relative to price = stronger)
+            premium_ratio = total_premium / spot_price
+            premium_strength = min(premium_ratio * 10, 1.0)  # Scale appropriately
+            
+            # Liquidity component
+            min_oi = min(call_data.get("oi", 0), put_data.get("oi", 0))
+            min_volume = min(call_data.get("volume", 0), put_data.get("volume", 0))
+            liquidity_strength = min((min_oi / 10000) * (min_volume / 1000), 1.0)
+            
+            # IV balance component (call and put IV should be similar)
+            call_iv = call_data.get("iv", 20)
+            put_iv = put_data.get("iv", 20)
+            iv_balance = 1.0 - abs(call_iv - put_iv) / max(call_iv, put_iv, 1)
+            
+            # Combined strength (weighted)
+            overall_strength = (
+                iv_strength * 0.4 +
+                premium_strength * 0.3 +
+                liquidity_strength * 0.2 +
+                iv_balance * 0.1
+            )
+            
+            return max(0.1, min(overall_strength, 1.0))
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating straddle strength: {e}")
+            return 0.5
+    
+    def _calculate_traditional_confidence(self, iv_rank: float, call_data: Dict, 
+                                        put_data: Dict, total_premium: float) -> float:
+        """Calculate confidence from traditional straddle indicators"""
+        try:
+            # IV rank confidence (higher IV rank = higher confidence)
+            iv_conf = min(iv_rank / 100, 1.0)
+            
+            # Premium collection confidence
+            premium_conf = min(total_premium / 200, 1.0)  # Assuming 200 is good premium
+            
+            # Liquidity confidence
+            avg_oi = (call_data.get("oi", 0) + put_data.get("oi", 0)) / 2
+            avg_volume = (call_data.get("volume", 0) + put_data.get("volume", 0)) / 2
+            liquidity_conf = min((avg_oi / 50000) * (avg_volume / 5000), 1.0)
+            
+            # Combined confidence
+            confidence = (iv_conf * 0.5 + premium_conf * 0.3 + liquidity_conf * 0.2)
+            
+            return max(0.2, min(confidence, 0.9))
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating traditional confidence: {e}")
+            return 0.5
+    
+    def _calculate_liquidity_score(self, call_data: Dict, put_data: Dict) -> float:
+        """Calculate liquidity score for the straddle"""
+        try:
+            call_oi = call_data.get("oi", 0)
+            put_oi = put_data.get("oi", 0)
+            call_volume = call_data.get("volume", 0)
+            put_volume = put_data.get("volume", 0)
+            
+            # Minimum values for good liquidity
+            min_oi = min(call_oi, put_oi)
+            min_volume = min(call_volume, put_volume)
+            
+            # Score based on minimum values (weaker leg determines liquidity)
+            oi_score = min(min_oi / 20000, 1.0)  # 20k OI = perfect score
+            volume_score = min(min_volume / 2000, 1.0)  # 2k volume = perfect score
+            
+            return (oi_score * 0.6 + volume_score * 0.4)
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating liquidity score: {e}")
+            return 0.5
+    
+    def _calculate_premium_attractiveness(self, total_premium: float, spot_price: float) -> float:
+        """Calculate how attractive the premium is relative to underlying price"""
+        try:
+            premium_ratio = total_premium / spot_price
+            
+            # Attractive premium is typically 1-3% of underlying
+            if 0.01 <= premium_ratio <= 0.03:
+                return 1.0
+            elif 0.005 <= premium_ratio <= 0.05:
+                return 0.7
+            elif premium_ratio > 0.05:
+                return 0.3  # Very high premium might indicate high risk
+            else:
+                return 0.2  # Very low premium not attractive
+                
+        except Exception as e:
+            self.logger.error(f"Error calculating premium attractiveness: {e}")
+            return 0.5
